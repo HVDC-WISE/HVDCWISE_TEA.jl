@@ -17,7 +17,7 @@
         saturation. A single optimisation period is considered.
         """
         # Read and process data
-        file = joinpath(_HWTEA_dir, "test/data/case5/case5_2grids_MC - curtailment.m")
+        file = joinpath(_HWTEA_dir, "test/data/case5/case5_3grids_MC - curtailment.m")
         data = _PM.parse_file(file)
         _HWTEA.process_additional_data!(data)
         # Increase demand at load of area 3
@@ -45,7 +45,7 @@ end
         converter connected to area 2.
         """
         # Read and process data
-        file = joinpath(_HWTEA_dir, "test/data/case5/case5_2grids_MC - curtailment.m")
+        file = joinpath(_HWTEA_dir, "test/data/case5/case5_3grids_MC - curtailment.m")
         data = _PM.parse_file(file)
         _HWTEA.process_additional_data!(data)
         # Increase renewable generation at the AC terminal of converter 2
