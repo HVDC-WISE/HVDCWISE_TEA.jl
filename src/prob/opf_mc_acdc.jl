@@ -101,7 +101,7 @@ function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true)
         # DC grid constraints
         _PMMCDC.constraint_voltage_dc(pm, n)
         # _PMMCDC.constraint_kcl_ground_dcgrid(pm, n)
-        _PMMCDC.constraint_converter_dc_ground_shunt_ohm(pm, n)
+        _PMMCDC.constraint_converter_dc_ground_shunt_ohm(pm; nw = n)
 
         for i in _PM.ids(pm, :busdc)
             _PMMCDC.constraint_kcl_shunt_dcgrid(pm, i; nw = n)
