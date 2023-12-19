@@ -33,6 +33,8 @@ include("core/variable.jl")
 include("form/acp.jl")
 include("form/dcp.jl")
 
+include("io/parse.jl")
+
 include("prob/opf_mc_acdc.jl")
 
 

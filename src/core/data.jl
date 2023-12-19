@@ -2,12 +2,12 @@
     process_additional_data!(data::Dict{String,Any})
 
 Organise, process and perform checks on data tables that are not used/recognised in PowerModels.
-These may include non-dispatchable generators, storages, flexible loads, phase-shift transformers and
-DC components (i.e. AC/DC converters and DC branches).
+These may include non-dispatchable generators, flexible loads, storages, phase-shift transformers and
+DC components (i.e., AC/DC converters and DC branches).
 
 Optional tables are:
  - `gencost` and `storage`, which are processed in PowerModels;
- - `ngen`, `storage_extra`, `load_extra`, which are processed in FlexPlan;
+ - `ndgen`, `storage_extra`, `load_extra`, which are processed in FlexPlan;
  - `busdc`, `convdc` and `branchdc`, which are processed in PowerModelsMCDC;
  - `pst`, which is processed in CbaOPF.
 
@@ -31,13 +31,10 @@ The available `load_extra` table parameters are:
  - `tshift_down` : Recovery period for downward demand shifting [h];
 
 """
-function process_additional_data!(data::Dict{String,Any})
+function process_additional_data!(data::Dict{String, Any})
     
-    if haskey(data, "busdc")
-        _PMMCDC.build_mc_data!(data)
-    end
-
     _FP._add_gen_data!(data)
+    _add_dcgrid_data!(data)
     _add_storage_data!(data)
     _add_flexible_demand_data!(data)
     _add_pst_data!(data)
@@ -47,7 +44,13 @@ end
 ## Auxiliary function
 
 
-function _add_flexible_demand_data!(data::Dict{String,Any})
+function _add_dcgrid_data!(data::Dict{String, Any})
+    if haskey(data, "busdc")
+        _PMMCDC.process_additional_data!(data)
+    end
+end
+
+function _add_flexible_demand_data!(data::Dict{String, Any})
 
     rescale_cost = x -> x*data["baseMVA"]
 
@@ -75,7 +78,7 @@ function _add_flexible_demand_data!(data::Dict{String,Any})
     end
 end
 
-function _add_storage_data!(data)
+function _add_storage_data!(data::Dict{String, Any})
     if haskey(data, "storage")
         for (s, storage) in data["storage"]
             rescale_power = x -> x/data["baseMVA"]
@@ -88,7 +91,7 @@ function _add_storage_data!(data)
     end
 end
 
-function _add_pst_data!(data::Dict{String,Any})
+function _add_pst_data!(data::Dict{String, Any})
     if haskey(data, "pst")
         if !haskey(data, "multinetwork") || data["multinetwork"] == false
             _CBA.to_pu_single_network_pst!(data)
@@ -99,5 +102,18 @@ function _add_pst_data!(data::Dict{String,Any})
         end
     else
         data["pst"] = Dict{String, Any}()
+    end
+end
+
+
+function find_value(data::Dict{String, <:Any})
+
+    for (_, value) in data
+        if isa(value, Dict)
+            return find_value(value)
+        else
+            return value
+            break
+        end
     end
 end
