@@ -55,16 +55,16 @@ mpc.busdc = [
 ];
 
 %% converter
-%column_names% busdc_i busac_i type_dc type_ac P_g Q_g islcc Vtar  rtf xtf transformer tm   bf filter   rc   xc reactor basekVac Vmmax Vmmin Imax status LossA LossB LossCrec LossCinv  droop   Pdcset Vdcset dVdcset Pacmax Pacmin Qacmax Qacmin conv_confi connect_at ground_type ground_z
+%column_names% busdc_i busac_i type_dc type_ac P_g Q_g islcc Vtar  rtf xtf transformer tm   bf filter   rc   xc reactor basekVac Vmmax Vmmin Imax status LossA LossB LossCrec LossCinv  droop   Pdcset Vdcset dVdcset Pacmax Pacmin Qacmax Qacmin conv_confi connect_at ground_type ground_z status_p status_n
 mpc.convdc = [
-	1	1	3	1	-8	0	0	1	0.01	0.01	1	1	0.01	1	0.01	0.01	1	400	1.05	0.95	1.1	1	0	0	0	0	0.0050	0	1	0	10	-10	10	-10 2 0 0 0.5;
-	2	2	3	1	8	0	0	1	0.01	0.01	1	1	0.01	1	0.01	0.01	1	400	1.05	0.95	1.1	1	0	0	0	0	0.0050	0	1	0	10	-10	10	-10 2 0 0 0.5;
+	1	1	3	1	-8	0	0	1	0.01	0.01	1	1	0.01	1	0.01	0.01	1	400	1.05	0.95	1.1	1	0	0	0	0	0.0050	0	1	0	10	-10	10	-10 2 0 0 0.5 1 1;
+	2	2	3	1	8	0	0	1	0.01	0.01	1	1	0.01	1	0.01	0.01	1	400	1.05	0.95	1.1	1	0	0	0	0	0.0050	0	1	0	10	-10	10	-10 2 0 0 0.5 1 1;
 ];
 
 %% DC branch
-%column_names% fbusdc tbusdc     r l c rateA rateB rateC status line_confi return_type return_z connect_at
+%column_names% fbusdc tbusdc     r l c rateA rateB rateC status line_confi return_type return_z connect_at status_p status_n status_r
 mpc.branchdc = [
-	1	2	0.052	0.0014	0.000004	100	100	100	1	2	2	0.052	0;
+	1	2	0.052	0.0014	0.000004	100	100	100	1	2	2	0.052	0 1 1 1;
 ];
 
 %% load additional data

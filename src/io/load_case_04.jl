@@ -4,9 +4,9 @@ import PowerModels as _PM
 import CSV
 import DataFrames
 import HiGHS
+import HVDCWISE_TEA as _HWTEA
 
-
-nlp_optimizer = _FP.optimizer_with_attributes(HiGHS.Optimizer, "output_flag"=>false)
+optimizer = _HWTEA.optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => true)
 
 ## Load test case
 file = normpath(@__DIR__,"../../test/data/Test04/.m_files/test04.m")
@@ -33,20 +33,6 @@ converters_status = CSV.read(normpath(@__DIR__,"../../test/data/Test04/.csv_file
 #Get the number of time points
 number_of_hours = size(CSV.read(normpath(@__DIR__,"../../test/data/Test04/.csv_files/load_fix_MW.csv"),DataFrames.DataFrame),1)
 
-#=
-Following dimensions:
-    hour: the finest time granularity that can be represented in a model. During an hour, each continuous variable has a constant value.
-    year: an investment period. Different investment decisions can be made in different years.
-    scenario: one of the different possible sets of values related to renewable generation and consumption data.
-=#
-planning_horizon = 10 # Years to scale generation costs
-_FP.add_dimension!(data, :hour, number_of_hours) # Add dimension, e.g. hours
-_FP.add_dimension!(data, :scenario, Dict(1 => Dict{String,Any}("probability"=>1)))
-_FP.add_dimension!(data, :year, 1; metadata = Dict{String,Any}("scale_factor"=>planning_horizon))
-
-_FP.scale_data!(data) # Scale investment & operational cost data based on planning years & hours
-
-
 # Initialize genprofile arrays
 genprofile = ones(length(data["gen"]), number_of_hours)
 # Populate genprofile based on generation status CSV file
@@ -59,7 +45,8 @@ loadprofile[:, :] .= demand_pu'
 
 # Create time series data to be passed to the data dictionay
 time_series = _FP.make_time_series(data, number_of_hours; loadprofile = permutedims(loadprofile), genprofile = permutedims(genprofile))
-mn_data = _FP.make_multinetwork(data, time_series) # Create the multinetwork data dictionary
+
+data = _HWTEA.parse_data(file, time_series) # reread the data and add multinetwork dimension
 
 #Modifying the AC line status with the timeseries data
 for (col_idx, col) in enumerate(names(AC_line_status))
@@ -67,7 +54,7 @@ for (col_idx, col) in enumerate(names(AC_line_status))
         timestamp = row_idx
         branch_id = col
         br_status = value
-        mn_data["nw"]["$timestamp"]["branch"]["$branch_id"]["br_status"] = br_status
+        data["nw"]["$timestamp"]["branch"]["$branch_id"]["br_status"] = br_status
     end
 end
 
@@ -82,7 +69,7 @@ for (col_idx, col) in enumerate(names(DC_line_status))
         timestamp = row_idx
         branchdc_id = col
         status = value
-        mn_data["nw"]["$timestamp"]["branchdc"]["$branchdc_id"]["status"] = status
+        data["nw"]["$timestamp"]["branchdc"]["$branchdc_id"]["status"] = status
     end
 end
 
@@ -96,27 +83,19 @@ for (col_idx, col) in enumerate(names(converters_status))
         timestamp = row_idx
         conv_id = col
         status = value
-        mn_data["nw"]["$timestamp"]["convdc"]["$conv_id"]["status"] = status
+        data["nw"]["$timestamp"]["convdc"]["$conv_id"]["status"] = status
     end
 end
 
+# HVDCWiseTEA settings
+s = Dict("output" => Dict("branch_flows" => true, "duals" =>true), "conv_losses_mp" => false)
+results = _HWTEA.solve_mc_acdcopf(data, _PM.DCPPowerModel, optimizer; setting = s)
 
-# FlexPlan settings
-s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => false, "add_co2_cost" => false)
-results = _FP.stoch_flex_tnep(mn_data, _PM.DCPPowerModel, nlp_optimizer; setting = s)
-results_2 = _FP.simple_stoch_flex_tnep(mn_data,_PM.DCPPowerModel, nlp_optimizer; setting = s)
 
-println("----------------STOCHASTIC FLEX TNEP----------------")
+println("----------------RESULTS----------------")
 _PM.print_summary(results["solution"]["nw"]["1"])
 _PM.print_summary(results["solution"]["nw"]["2"])
 _PM.print_summary(results["solution"]["nw"]["3"])
 _PM.print_summary(results["solution"]["nw"]["4"])
 _PM.print_summary(results["solution"]["nw"]["5"])
 _PM.print_summary(results["solution"]["nw"]["6"])
-println("----------------SIMPLE STOCHASTIC FLEX TNEP----------------")
-_PM.print_summary(results_2["solution"]["nw"]["1"])
-_PM.print_summary(results_2["solution"]["nw"]["2"])
-_PM.print_summary(results_2["solution"]["nw"]["3"])
-_PM.print_summary(results_2["solution"]["nw"]["4"])
-_PM.print_summary(results_2["solution"]["nw"]["5"])
-_PM.print_summary(results_2["solution"]["nw"]["6"])
