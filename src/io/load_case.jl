@@ -22,11 +22,11 @@ function load_case(test_case_name)
     demand_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\load_fix_MW.csv")
     generation_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\status_generators.csv")
     AC_line_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\status_lines_AC.csv")
-    DC_line_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\status_lines_DC_temp.csv")
-    converters_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\status_converters_temp.csv")
+    DC_line_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\status_lines_DC.csv")
+    converters_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\status_converters.csv")
 
     demand = CSV.read(demand_file, DataFrames.DataFrame)[:, 2:end]
-    demand_pu = demand[:, 1] ./ maximum(demand[:, 1])
+    demand_pu = demand[:, 1] #=./ maximum(demand[:, 1])=#
 
     # get all rows of the 2nd column, the first row is the timestamp & the index of the generators in the mpc.generator table in the .m file
     generation_status = CSV.read(generation_status_file,DataFrames.DataFrame)[:,2:end]
@@ -61,34 +61,56 @@ function load_case(test_case_name)
             data["nw"]["$timestamp"]["branch"]["$branch_id"]["br_status"] = br_status
         end
     end
-    
+
     # Modifying the DC lines status with the timeseries data
     if isfile(DC_line_status_file)
-        DC_line_status = CSV.read(DC_line_status_file, DataFrames.DataFrame)[:, 2:end]
-        for (col_idx, col) in enumerate(names(DC_line_status))
-            for (row_idx, value) in enumerate(DC_line_status[!, col])
-                timestamp = row_idx
-                branchdc_id = col
-                status = value
-                data["nw"]["$timestamp"]["branchdc"]["$branchdc_id"]["status"] = status
+        DC_line_status = CSV.read(DC_line_status_file, DataFrames.DataFrame)
+
+        for (row_idx, timestamp) in enumerate(DC_line_status[!, 1])
+            for col_group_idx in 1:3:size(DC_line_status, 2)-2  # iterating by group of 3 columns (+, - , MR) for each DC lines
+                # Branchdc_id is inferred from the column index
+                branchdc_id = div(col_group_idx, 3) + 1
+
+                # Separate variables for each status type
+                status_p = DC_line_status[row_idx, col_group_idx + 1] # positive phase is the first column of the group
+                status_n = DC_line_status[row_idx, col_group_idx + 2] # negative phase is the second column of the group
+                status_r = DC_line_status[row_idx, col_group_idx + 3] # metallic return phase is the third column of the group
+
+                # Assign values to the corresponding fields
+                data["nw"]["$timestamp"]["branchdc"]["$branchdc_id"]["status_p"] = status_p
+                data["nw"]["$timestamp"]["branchdc"]["$branchdc_id"]["status_n"] = status_n
+                data["nw"]["$timestamp"]["branchdc"]["$branchdc_id"]["status_r"] = status_r
             end
         end
     end
 
-    # Modifying the ACDC converters  status with the timeseries data
+    # Modifying the ACDC converters status with the timeseries data
     if isfile(converters_status_file)
-        converters_status = CSV.read(converters_status_file, DataFrames.DataFrame)[:, 2:end]
-        for (col_idx, col) in enumerate(names(converters_status))
-            for (row_idx, value) in enumerate(converters_status[!, col])
-                timestamp = row_idx
-                conv_id = col
-                status = value
-                data["nw"]["$timestamp"]["convdc"]["$conv_id"]["status"] = status
+        converters_status = CSV.read(converters_status_file, DataFrames.DataFrame)
+
+        for (row_idx, timestamp) in enumerate(converters_status[!, 1])
+            for col_group_idx in 1:2:size(converters_status, 2)-1 # iterating by group of 2 columns (+, -) for each AC/DC conv
+                # Conv_id is inferred from the column index
+                conv_id = div(col_group_idx, 2) + 1
+
+                # Separate variables for each status type
+                status_p = converters_status[row_idx, col_group_idx + 1] # positive converter is the first column of the group
+                status_n = converters_status[row_idx, col_group_idx + 2] # negative converter is the second column of the group
+
+                # Assign values to the corresponding fields
+                data["nw"]["$timestamp"]["convdc"]["$conv_id"]["status_p"] = status_p
+                data["nw"]["$timestamp"]["convdc"]["$conv_id"]["status_n"] = status_n
             end
         end
     end
 
     # HVDCWiseTEA settings
     s = Dict("output" => Dict("branch_flows" => true, "duals" => true), "conv_losses_mp" => false)
+
+    # TEST
+    _PM.propagate_topology_status!(data)  # TODO check if usefull
+    #data["per_unit"] = true
+    _PM.make_mixed_units!(data) # TODO check if usefull
+
    return _HWTEA.solve_mc_acdcopf(data, _PM.DCPPowerModel, optimizer; setting = s)
 end

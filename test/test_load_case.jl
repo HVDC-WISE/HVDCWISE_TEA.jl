@@ -6,6 +6,7 @@ results_1 = load_case("Test01")
 if results_1 !== nothing
     println("---------------- RESULTS TEST CASE 1 ----------------")
     for network_id in 1:length(results_1["solution"]["nw"])
+        print("timestep : $network_id"  )
         _PM.print_summary(results_1["solution"]["nw"]["$network_id"])
     end
 else
@@ -18,6 +19,7 @@ results_4 = load_case("Test04")
 if results_4 !== nothing
     println("---------------- RESULTS TEST CASE 4 ----------------")
     for network_id in 1:length(results_4["solution"]["nw"])
+        print("timestep : $network_id"  )
         _PM.print_summary(results_4["solution"]["nw"]["$network_id"])
     end
 else

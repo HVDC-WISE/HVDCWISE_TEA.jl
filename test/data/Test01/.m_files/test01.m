@@ -6,7 +6,7 @@ mpc.version = '2';
 
 %%-----  Power Flow Data  -----%%
 %% system MVA base
-mpc.baseMVA = 1.0
+mpc.baseMVA = 100
 
 mpc.time_elapsed = 1.0;
 
@@ -25,14 +25,6 @@ mpc.gen = [
     1 10  0    10   -10  1   1      1   10    0;
 ];
 
-%% loads
-% Investment cost: 1 k€/MW; lifetime: 10 years
-%column_names% load_id ered_rel_max pred_rel_max pshift_up_rel_max pshift_down_rel_max eshift_rel_max tshift_up tshift_down cost_red cost_shift cost_curt cost_inv flex co2_cost lifetime
-mpc.load_extra = [
-                     1         0.01          0.3               0.3                 1.0            0.1        10          10    100.0       10.0   10000.0    80000    1      0.0       10;
-];
-
-
 %% generator cost
 % 1 startup shutdown n x1 y1 ... xn yn
 % 2 startup shutdown n c(n-1) ... c0
@@ -48,11 +40,11 @@ mpc.branch = [
 
 %column_names% c_rating_a
 mpc.branch_currents = [
-                      1500;
+                      15.00;
 ];
 
 %% load additional data
 %column_names% load_id pf_angle pshift_up_rel_max pshift_down_rel_max tshift_up tshift_down eshift_rel_max pred_rel_max ered_rel_max cost_shift cost_red cost_curt  cost_inv flex co2_cost lifetime
 mpc.load_extra = [
-                     1   0.1974               0.5                 1.0         4           4            1.0         0.25         0.05       10.0    100.0   10000.0  100000.0    0      0.0       10;
+                     1   0              0                 0         0           0            0        0         0      10.0    100.0   1e4  100000.0    0      0.0       10;
 ];
