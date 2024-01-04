@@ -43,9 +43,14 @@ mpc.branch = [
 ];
 
 %column_names% c_rating_a
-mpc.branch_currents = [
-	1500;
-];
+%mpc.branch_currents = [
+%	1500;
+%];
+
+%% dc grid topology
+%colunm_names% dcpoles
+%mpc.dcpol=2;
+% numbers of poles (1=monopolar grid, 2=bipolar grid)
 
 %% DC bus
 %column_names% busdc_i grid Pdc Vdc basekVdc Vdcmax Vdcmin Cdc

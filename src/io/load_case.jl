@@ -26,8 +26,14 @@ function load_case(test_case_name)
     converters_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\status_converters.csv")
 
     demand = CSV.read(demand_file, DataFrames.DataFrame)[:, 2:end]
-    demand_pu = demand[:, 1] #=./ maximum(demand[:, 1])=#
+    demand_pu = demand[:, 1]
+    
+    # TODO one liner equivalent : demand_pu .= data["load"] .|> (l, load) -> demand_pu[:, parse(Int, l)] ./ load["pd"] #  dividing .csv demand  / .m demand for each load
+    for (l,load) in data["load"]
+        demand_pu = demand_pu[:, parse(Int, l)] ./ load["pd"]   
 
+    end 
+    
     # get all rows of the 2nd column, the first row is the timestamp & the index of the generators in the mpc.generator table in the .m file
     generation_status = CSV.read(generation_status_file,DataFrames.DataFrame)[:,2:end]
 
@@ -49,7 +55,6 @@ function load_case(test_case_name)
 
     # Create time series data to be passed to the data dictionary
     time_series = _FP.make_time_series(data, number_of_hours; loadprofile = permutedims(loadprofile), genprofile = permutedims(genprofile))
-
     data = _HWTEA.parse_data(file, time_series) # reread the data and add multinetwork dimension
 
     # Modifying the AC line status with the timeseries data
@@ -65,7 +70,6 @@ function load_case(test_case_name)
     # Modifying the DC lines status with the timeseries data
     if isfile(DC_line_status_file)
         DC_line_status = CSV.read(DC_line_status_file, DataFrames.DataFrame)
-
         for (row_idx, timestamp) in enumerate(DC_line_status[!, 1])
             for col_group_idx in 1:3:size(DC_line_status, 2)-2  # iterating by group of 3 columns (+, - , MR) for each DC lines
                 # Branchdc_id is inferred from the column index
@@ -87,7 +91,6 @@ function load_case(test_case_name)
     # Modifying the ACDC converters status with the timeseries data
     if isfile(converters_status_file)
         converters_status = CSV.read(converters_status_file, DataFrames.DataFrame)
-
         for (row_idx, timestamp) in enumerate(converters_status[!, 1])
             for col_group_idx in 1:2:size(converters_status, 2)-1 # iterating by group of 2 columns (+, -) for each AC/DC conv
                 # Conv_id is inferred from the column index
@@ -109,8 +112,9 @@ function load_case(test_case_name)
 
     # TEST
     _PM.propagate_topology_status!(data)  # TODO check if usefull
-    #data["per_unit"] = true
-    _PM.make_mixed_units!(data) # TODO check if usefull
+    #data["per_unit"] = false
+    #_PM.make_mixed_units!(data) # TODO check if usefull
+    #_PM.make_per_unit!(data) # TODO check if usefull
 
    return _HWTEA.solve_mc_acdcopf(data, _PM.DCPPowerModel, optimizer; setting = s)
 end
