@@ -1,6 +1,5 @@
 function mpc = test04_acdc()
 
-%%Files are in Flexplan Github
 %% MATPOWER Case Format : Version 2
 mpc.version = '2';
 

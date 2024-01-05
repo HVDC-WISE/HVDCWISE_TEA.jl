@@ -12,25 +12,24 @@ const _HWTEA_dir = dirname(dirname(pathof(_HWTEA))) # Root directory of HVDCWISE
 
 
 function load_case(test_case_name)
-    optimizer = _HWTEA.optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => true)
+    optimizer = _HWTEA.optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false)
 
     ## Load test case
     file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.m_files\\$test_case_name.m")
     data = _FP.parse_file(file) # Parse input file to obtain data dictionary
 
     # Read CSV files
-    demand_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\load_fix_MW.csv")
-    generation_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\status_generators.csv")
-    AC_line_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\status_lines_AC.csv")
-    DC_line_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\status_lines_DC.csv")
-    converters_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\status_converters.csv")
+    demand_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\loads_MW.csv")
+    generation_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\generators_statuses.csv")
+    AC_line_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\AC_lines_statuses.csv")
+    DC_line_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\DC_lines_statuses.csv")
+    converters_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\converters_statuses.csv")
 
     demand = CSV.read(demand_file, DataFrames.DataFrame)[:, 2:end]
     demand_pu = demand[:, 1]
     
     for (l,load) in data["load"]
-        demand_pu = demand_pu[:, parse(Int, l)] ./ load["pd"]   
-
+        demand_pu = demand_pu[:, parse(Int, l)] ./ load["pd"]
     end 
     
     # get all rows of the 2nd column, the first row is the timestamp & the index of the generators in the mpc.generator table in the .m file
@@ -40,7 +39,7 @@ function load_case(test_case_name)
     AC_line_status = CSV.read(AC_line_status_file,DataFrames.DataFrame)[:,2:end]
         
     # Get the number of time points
-    number_of_hours = size(CSV.read(joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\load_fix_MW.csv"), DataFrames.DataFrame), 1)
+    number_of_hours = size(CSV.read(joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\loads_MW.csv"), DataFrames.DataFrame), 1)
 
     # Initialize genprofile arrays
     genprofile = ones(length(data["gen"]), number_of_hours)
