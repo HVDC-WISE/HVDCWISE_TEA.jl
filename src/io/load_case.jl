@@ -28,7 +28,6 @@ function load_case(test_case_name)
     demand = CSV.read(demand_file, DataFrames.DataFrame)[:, 2:end]
     demand_pu = demand[:, 1]
     
-    # TODO one liner equivalent : demand_pu .= data["load"] .|> (l, load) -> demand_pu[:, parse(Int, l)] ./ load["pd"] #  dividing .csv demand  / .m demand for each load
     for (l,load) in data["load"]
         demand_pu = demand_pu[:, parse(Int, l)] ./ load["pd"]   
 
@@ -70,6 +69,15 @@ function load_case(test_case_name)
     # Modifying the DC lines status with the timeseries data
     if isfile(DC_line_status_file)
         DC_line_status = CSV.read(DC_line_status_file, DataFrames.DataFrame)
+        
+        # Extract header information to check the phase order in the CSV
+        header_phases_dc = [split(name, "_")[2] for name in names(DC_line_status)[2:end]]
+        expected_phases_dc = [i % 3 == 1 ? "+" : i % 3 == 2 ? "-" : "MR" for i in 1:length(header_phases_dc)]
+
+        if expected_phases_dc != header_phases_dc
+            error("Unexpected phase order in DC line status file header.\n Order X_+;X_-;X_MR for component X expected")
+        end
+
         for (row_idx, timestamp) in enumerate(DC_line_status[!, 1])
             for col_group_idx in 1:3:size(DC_line_status, 2)-2  # iterating by group of 3 columns (+, - , MR) for each DC lines
                 # Branchdc_id is inferred from the column index
@@ -91,6 +99,15 @@ function load_case(test_case_name)
     # Modifying the ACDC converters status with the timeseries data
     if isfile(converters_status_file)
         converters_status = CSV.read(converters_status_file, DataFrames.DataFrame)
+        
+        # Extract header information to check the phase order in the CSV
+        header_phases_conv = [split(name, "_")[2] for name in names(converters_status)[2:end]]
+        expected_phases_conv = [i % 2 == 1 ? "+" : "-" for i in 1:length(header_phases_conv)]
+
+        if expected_phases_conv != header_phases_conv
+            error("Unexpected phase order in converter status file header.\n Order X_+;X_-; for component X expected")
+        end
+
         for (row_idx, timestamp) in enumerate(converters_status[!, 1])
             for col_group_idx in 1:2:size(converters_status, 2)-1 # iterating by group of 2 columns (+, -) for each AC/DC conv
                 # Conv_id is inferred from the column index
