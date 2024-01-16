@@ -4,124 +4,155 @@
 import FlexPlan as _FP
 import PowerModels as _PM
 import CSV
-import DataFrames
+using  DataFrames
 import HiGHS
 import HVDCWISE_TEA as _HWTEA
 
 const _HWTEA_dir = dirname(dirname(pathof(_HWTEA))) # Root directory of HVDCWISE_TEA package
 
-
 function load_case(test_case_name)
-    optimizer = _HWTEA.optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false)
+    # define optimizer
+    optimizer = _HWTEA.optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false) # linear solver
 
     ## Load test case
     file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.m_files\\$test_case_name.m")
-    data = _FP.parse_file(file) # Parse input file to obtain data dictionary
 
-    # Read CSV files
-    demand_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\loads_MW.csv")
-    generation_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\generators_statuses.csv")
-    AC_line_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\AC_lines_statuses.csv")
-    DC_line_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\DC_lines_statuses.csv")
-    converters_status_file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\converters_statuses.csv")
+    ## Read CSV files
+    # Generation related files
+    wind_gen_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\wind_MW.csv")
+    pv_gen_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\pv_MW.csv")
+    hydro_river_gen_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\hydro_river_MW.csv")
 
-    demand = CSV.read(demand_file, DataFrames.DataFrame)[:, 2:end]
-    demand_pu = demand[:, 1]
-    
-    for (l,load) in data["load"]
-        demand_pu = demand_pu[:, parse(Int, l)] ./ load["pd"]
-    end 
-    
-    # get all rows of the 2nd column, the first row is the timestamp & the index of the generators in the mpc.generator table in the .m file
-    generation_status = CSV.read(generation_status_file,DataFrames.DataFrame)[:,2:end]
+    # Load related files
+    fix_loads_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\loads_fix_MW.csv")
+    flex_loads_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\loads_flex_MW.csv")
 
-    # get all rows of the 2nd column, the first row is the timestamp & the index of the AC line in the mpc.generator table in the .m file
-    AC_line_status = CSV.read(AC_line_status_file,DataFrames.DataFrame)[:,2:end]
+    # Generation\Load related file
+    hydro_dam_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\hydro_dam_MW.csv")  # TODO process those data
+
+    # Statuses file
+    generation_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\generators_statuses.csv")
+    AC_lines_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\AC_lines_statuses.csv")
+    DC_lines_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\DC_lines_statuses.csv")
+    converters_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\converters_statuses.csv")
+    pst_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\PST_statuses.csv")  # TODO process those data
+    storage_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\storage_statuses.csv")  # TODO process those data
+
+    time_series = Dict{String, Dict{String, Dict{String, Dict{String, Any}}}}(key => Dict() for key in ["gen", "load", "branch", "branchdc", "convdc"])
         
-    # Get the number of time points
-    number_of_hours = size(CSV.read(joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\loads_MW.csv"), DataFrames.DataFrame), 1)
+    gen_files = [wind_gen_path,pv_gen_path,hydro_river_gen_path]
+    load_files = [fix_loads_path,flex_loads_path]
 
-    # Initialize genprofile arrays
-    genprofile = ones(length(data["gen"]), number_of_hours)
-    # Populate genprofile based on generation status CSV file
-    genprofile[:, :] .= generation_status[:, 1]'
-
-    # Initialize loadprofile arrays
-    loadprofile = ones(length(data["load"]), number_of_hours)
-    # Populate loadprofile based on demand CSV file
-    loadprofile[:, :] .= demand_pu'
-
-    # Create time series data to be passed to the data dictionary
-    time_series = _FP.make_time_series(data, number_of_hours; loadprofile = permutedims(loadprofile), genprofile = permutedims(genprofile))
-    data = _HWTEA.parse_data(file, time_series) # reread the data and add multinetwork dimension
-
-    # Modifying the AC line status with the timeseries data
-    for (col_idx, col) in enumerate(names(AC_line_status))
-        for (row_idx, value) in enumerate(AC_line_status[!, col])
-            timestamp = row_idx
-            branch_id = col
-            br_status = value
-            data["nw"]["$timestamp"]["branch"]["$branch_id"]["br_status"] = br_status
+    # Aggregate  values for each file type
+    aggregate_generation_values!(time_series, gen_files)
+    aggregate_loads_values!(time_series, load_files)
+ 
+    gen_statuses_data = read_csv_file(generation_statuses_path)[:,2:end]
+    if !isempty(gen_statuses_data)
+        for (_, col) in enumerate(names(gen_statuses_data))
+            for (row_idx, value) in enumerate(gen_statuses_data[!, col])
+                timestamp = row_idx
+                gen_id = col
+                gen_status = value
+                time_series["gen"]["$gen_id"]["pmax"]["$timestamp"] = time_series["gen"]["$gen_id"]["pmax"]["$timestamp"]*gen_status
+            end
         end
     end
 
+    # get all rows of the 2nd column, the first row is the timestamp & the index of the AC line in the mpc.generator table in the .m file
+    AC_lines_statuses_data = read_csv_file(AC_lines_statuses_path)[:,2:end]
+
+    if !isempty(AC_lines_statuses_data)
+        # Modifying the AC line status with the timeseries data
+        for (_, col) in enumerate(names(AC_lines_statuses_data))
+            for (row_idx, value) in enumerate(AC_lines_statuses_data[!, col])
+                timestamp = row_idx
+                branch_id = col
+                br_status = value
+                if !haskey(time_series["branch"], "$branch_id")
+                    time_series["branch"]["$branch_id"]= Dict()
+                end
+                if !haskey(time_series["branch"]["$branch_id"], "br_status")
+                    time_series["branch"]["$branch_id"]["br_status"] = Dict()
+                end
+                if !haskey(time_series["branch"]["$branch_id"]["br_status"] , "$timestamp")
+                    time_series["branch"]["$branch_id"]["br_status"]["$timestamp"] = br_status
+                end
+            end
+        end
+    end
+    
     # Modifying the DC lines status with the timeseries data
-    if isfile(DC_line_status_file)
-        DC_line_status = CSV.read(DC_line_status_file, DataFrames.DataFrame)
-        
+    DC_line_statuses_data = read_csv_file(DC_lines_statuses_path)
+    if !isempty(DC_line_statuses_data)
         # Extract header information to check the phase order in the CSV
-        header_phases_dc = [split(name, "_")[2] for name in names(DC_line_status)[2:end]]
+        header_phases_dc = [split(name, "_")[2] for name in names(DC_line_statuses_data)[2:end]]
         expected_phases_dc = [i % 3 == 1 ? "+" : i % 3 == 2 ? "-" : "MR" for i in 1:length(header_phases_dc)]
 
         if expected_phases_dc != header_phases_dc
             error("Unexpected phase order in DC line status file header.\n Order X_+;X_-;X_MR for component X expected")
         end
 
-        for (row_idx, timestamp) in enumerate(DC_line_status[!, 1])
-            for col_group_idx in 1:3:size(DC_line_status, 2)-2  # iterating by group of 3 columns (+, - , MR) for each DC lines
+        for (row_idx, timestamp) in enumerate(DC_line_statuses_data[!, 1])
+            for col_group_idx in 1:3:size(DC_line_statuses_data, 2)-2  # iterating by group of 3 columns (+, - , MR) for each DC lines
                 # Branchdc_id is inferred from the column index
                 branchdc_id = div(col_group_idx, 3) + 1
 
                 # Separate variables for each status type
-                status_p = DC_line_status[row_idx, col_group_idx + 1] # positive phase is the first column of the group
-                status_n = DC_line_status[row_idx, col_group_idx + 2] # negative phase is the second column of the group
-                status_r = DC_line_status[row_idx, col_group_idx + 3] # metallic return phase is the third column of the group
-
+                status_p = DC_line_statuses_data[row_idx, col_group_idx + 1] # positive phase is the first column of the group
+                status_n = DC_line_statuses_data[row_idx, col_group_idx + 2] # negative phase is the second column of the group
+                status_r = DC_line_statuses_data[row_idx, col_group_idx + 3] # metallic return phase is the third column of the group
+                
                 # Assign values to the corresponding fields
-                data["nw"]["$timestamp"]["branchdc"]["$branchdc_id"]["status_p"] = status_p
-                data["nw"]["$timestamp"]["branchdc"]["$branchdc_id"]["status_n"] = status_n
-                data["nw"]["$timestamp"]["branchdc"]["$branchdc_id"]["status_r"] = status_r
+                if !haskey(time_series["branchdc"], "$branchdc_id")
+                    time_series["branchdc"]["$branchdc_id"] = Dict()
+                end
+                if !haskey(time_series["branchdc"]["$branchdc_id"], "status")
+                    time_series["branchdc"]["$branchdc_id"]["status"] = Dict()
+                end
+                if !haskey(time_series["branchdc"]["$branchdc_id"]["status"] , "$timestamp")
+                    time_series["branchdc"]["$branchdc_id"]["status"]["$timestamp"] = [status_p, status_n, status_r]
+                end
             end
         end
     end
 
     # Modifying the ACDC converters status with the timeseries data
-    if isfile(converters_status_file)
-        converters_status = CSV.read(converters_status_file, DataFrames.DataFrame)
+    converters_statuses_data = read_csv_file(converters_statuses_path)
+    if !isempty(converters_statuses_data)
         
         # Extract header information to check the phase order in the CSV
-        header_phases_conv = [split(name, "_")[2] for name in names(converters_status)[2:end]]
+        header_phases_conv = [split(name, "_")[2] for name in names(converters_statuses_data)[2:end]]
         expected_phases_conv = [i % 2 == 1 ? "+" : "-" for i in 1:length(header_phases_conv)]
 
         if expected_phases_conv != header_phases_conv
             error("Unexpected phase order in converter status file header.\n Order X_+;X_-; for component X expected")
         end
 
-        for (row_idx, timestamp) in enumerate(converters_status[!, 1])
-            for col_group_idx in 1:2:size(converters_status, 2)-1 # iterating by group of 2 columns (+, -) for each AC/DC conv
+        for (row_idx, timestamp) in enumerate(converters_statuses_data[!, 1])
+            for col_group_idx in 1:2:size(converters_statuses_data, 2)-1 # iterating by group of 2 columns (+, -) for each AC/DC conv
                 # Conv_id is inferred from the column index
                 conv_id = div(col_group_idx, 2) + 1
 
                 # Separate variables for each status type
-                status_p = converters_status[row_idx, col_group_idx + 1] # positive converter is the first column of the group
-                status_n = converters_status[row_idx, col_group_idx + 2] # negative converter is the second column of the group
+                status_p = converters_statuses_data[row_idx, col_group_idx + 1] # positive converter is the first column of the group
+                status_n = converters_statuses_data[row_idx, col_group_idx + 2] # negative converter is the second column of the group
 
                 # Assign values to the corresponding fields
-                data["nw"]["$timestamp"]["convdc"]["$conv_id"]["status_p"] = status_p
-                data["nw"]["$timestamp"]["convdc"]["$conv_id"]["status_n"] = status_n
+                if !haskey(time_series["convdc"], "$conv_id")
+                    time_series["convdc"]["$conv_id"] = Dict()
+                end
+                if !haskey(time_series["convdc"]["$conv_id"], "status")
+                    time_series["convdc"]["$conv_id"]["status"] = Dict()
+                end
+                if !haskey(time_series["convdc"]["$conv_id"]["status"] , "$timestamp")
+                    time_series["convdc"]["$conv_id"]["status"]["$timestamp"] = [status_p, status_n]
+                end
             end
         end
     end
+
+    global data = _HWTEA.parse_data(file, time_series) # read the data and add multinetwork dimension
 
     # HVDCWiseTEA settings
     s = Dict("output" => Dict("branch_flows" => true, "duals" => true), "conv_losses_mp" => false)
@@ -134,3 +165,93 @@ function load_case(test_case_name)
 
    return _HWTEA.solve_mc_acdcopf(data, _PM.DCPPowerModel, optimizer; setting = s)
 end
+
+# Function to read CSV file if it exists
+function read_csv_file(file_path)
+    if isfile(file_path)
+        return CSV.File(file_path, delim=';') |> DataFrames.DataFrame
+    else
+        return DataFrames.DataFrame()  # Return an empty DataFrame if the file doesn't exist
+    end
+end
+
+# Function to aggregrate the generation values of the several generation files
+function aggregate_generation_values!(time_series, gen_files)
+    for gen_file in gen_files
+        gen_data = read_csv_file(gen_file)
+        if !isempty(gen_data)
+            # Extract generator IDs (excluding the first column 'Time')
+            gen_ids = string.(names(gen_data[:, 2:end]))
+            # Convert timestamp symbols to strings
+            timestamps = string.(gen_data.Time)
+
+            # Iterate over timestamps
+            for (timestamp_idx, timestamp) in enumerate(timestamps)
+                # Iterate over generator IDs
+                for (gen_id_idx, gen_id) in enumerate(gen_ids)
+                    gen_value = gen_data[!, gen_id_idx + 1][timestamp_idx]  # Extract gen_value for the current gen_id
+
+                    # Update time_series with aggregated generation values using haskey
+                    if !haskey(time_series, "gen")
+                        time_series["gen"] = Dict()
+                    end
+
+                    if !haskey(time_series["gen"], gen_id)
+                        time_series["gen"][gen_id] = Dict()
+                    end
+
+                    if !haskey(time_series["gen"][gen_id], "pmax")
+                        time_series["gen"][gen_id]["pmax"] = Dict()
+                    end
+
+                    if !haskey(time_series["gen"][gen_id]["pmax"], timestamp)
+                        time_series["gen"][gen_id]["pmax"][timestamp] = 0
+                    end
+
+                    time_series["gen"][gen_id]["pmax"][timestamp] += gen_value
+                end
+            end
+        end
+    end
+end
+
+# Function to aggregrate the loads values of the several load files
+function aggregate_loads_values!(time_series, load_files)
+    for load_file in load_files
+        load_data = read_csv_file(load_file)
+        if !isempty(load_data)
+            # Extract generator IDs (excluding the first column 'Time')
+            load_ids = string.(names(load_data[:, 2:end]))
+            # Convert timestamp symbols to strings
+            timestamps = string.(load_data.Time)
+
+            # Iterate over timestamps
+            for (timestamp_idx, timestamp) in enumerate(timestamps)
+                # Iterate over generator IDs
+                for (load_id_idx, load_id) in enumerate(load_ids)
+                    load_value = load_data[!, load_id_idx + 1][timestamp_idx]  # Extract gen_value for the current gen_id
+
+                    # Update time_series with aggregated generation values using haskey
+                    if !haskey(time_series, "load")
+                        time_series["load"] = Dict()
+                    end
+
+                    if !haskey(time_series["load"], load_id)
+                        time_series["load"][load_id] = Dict()
+                    end
+
+                    if !haskey(time_series["load"][load_id], "pd")
+                        time_series["load"][load_id]["pd"] = Dict()
+                    end
+
+                    if !haskey(time_series["load"][load_id]["pd"], timestamp)
+                        time_series["load"][load_id]["pd"][timestamp] = 0
+                    end
+
+                    time_series["load"][load_id]["pd"][timestamp] += load_value
+                end
+            end
+        end
+    end
+end
+
