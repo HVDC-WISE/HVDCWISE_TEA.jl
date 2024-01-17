@@ -61,10 +61,10 @@ function load_case(test_case_name)
     end
 
     # Modifying the AC lines status with the timeseries data
-    AC_lines_statuses_data = read_csv_file(ac_lines_statuses_path)[:,2:end]
-    if !isempty(AC_lines_statuses_data)
-        for (_, col) in enumerate(names(AC_lines_statuses_data))
-            for (row_idx, value) in enumerate(AC_lines_statuses_data[!, col])
+    ac_lines_statuses_data = read_csv_file(ac_lines_statuses_path)[:,2:end]
+    if !isempty(ac_lines_statuses_data)
+        for (_, col) in enumerate(names(ac_lines_statuses_data))
+            for (row_idx, value) in enumerate(ac_lines_statuses_data[!, col])
                 timestamp = row_idx
                 branch_id = col
                 br_status = value
@@ -103,10 +103,10 @@ function load_case(test_case_name)
     end
 
     # Modifying the pst status with the timeseries data
-    PST_statuses_data = read_csv_file(pst_statuses_path)[:,2:end]
-    if !isempty(PST_statuses_data)
-        for (_, col) in enumerate(names(PST_statuses_data))
-            for (row_idx, value) in enumerate(PST_statuses_data[!, col])
+    pst_statuses_data = read_csv_file(pst_statuses_path)[:,2:end]
+    if !isempty(pst_statuses_data)
+        for (_, col) in enumerate(names(pst_statuses_data))
+            for (row_idx, value) in enumerate(pst_statuses_data[!, col])
                 timestamp = row_idx
                 pst_id = col
                 pst_status = value
@@ -124,25 +124,25 @@ function load_case(test_case_name)
     end
     
     # Modifying the DC lines status with the timeseries data
-    DC_line_statuses_data = read_csv_file(dc_lines_statuses_path)
-    if !isempty(DC_line_statuses_data)
+    dc_line_statuses_data = read_csv_file(dc_lines_statuses_path)
+    if !isempty(dc_line_statuses_data)
         # Extract header information to check the phase order in the CSV
-        header_phases_dc = [split(name, "_")[2] for name in names(DC_line_statuses_data)[2:end]]
+        header_phases_dc = [split(name, "_")[2] for name in names(dc_line_statuses_data)[2:end]]
         expected_phases_dc = [i % 3 == 1 ? "+" : i % 3 == 2 ? "-" : "MR" for i in 1:length(header_phases_dc)]
 
         if expected_phases_dc != header_phases_dc
             error("Unexpected phase order in DC line status file header.\n Order X_+;X_-;X_MR for component X expected")
         end
 
-        for (row_idx, timestamp) in enumerate(DC_line_statuses_data[!, 1])
-            for col_group_idx in 1:3:size(DC_line_statuses_data, 2)-2  # iterating by group of 3 columns (+, - , MR) for each DC lines
+        for (row_idx, timestamp) in enumerate(dc_line_statuses_data[!, 1])
+            for col_group_idx in 1:3:size(dc_line_statuses_data, 2)-2  # iterating by group of 3 columns (+, - , MR) for each DC lines
                 # Branchdc_id is inferred from the column index
                 branchdc_id = div(col_group_idx, 3) + 1
 
                 # Separate variables for each status type
-                status_p = DC_line_statuses_data[row_idx, col_group_idx + 1] # positive phase is the first column of the group
-                status_n = DC_line_statuses_data[row_idx, col_group_idx + 2] # negative phase is the second column of the group
-                status_r = DC_line_statuses_data[row_idx, col_group_idx + 3] # metallic return phase is the third column of the group
+                status_p = dc_line_statuses_data[row_idx, col_group_idx + 1] # positive phase is the first column of the group
+                status_n = dc_line_statuses_data[row_idx, col_group_idx + 2] # negative phase is the second column of the group
+                status_r = dc_line_statuses_data[row_idx, col_group_idx + 3] # metallic return phase is the third column of the group
                 
                 # Assign values to the corresponding fields
                 if !haskey(time_series["branchdc"], "$branchdc_id")
@@ -236,19 +236,15 @@ function aggregate_generation_values!(time_series, gen_files)
                     if !haskey(time_series, "gen")
                         time_series["gen"] = Dict()
                     end
-
                     if !haskey(time_series["gen"], gen_id)
                         time_series["gen"][gen_id] = Dict()
                     end
-
                     if !haskey(time_series["gen"][gen_id], "pmax")
                         time_series["gen"][gen_id]["pmax"] = Dict()
                     end
-
                     if !haskey(time_series["gen"][gen_id]["pmax"], timestamp)
                         time_series["gen"][gen_id]["pmax"][timestamp] = 0
                     end
-
                     time_series["gen"][gen_id]["pmax"][timestamp] += gen_value
                 end
             end
@@ -276,19 +272,15 @@ function aggregate_loads_values!(time_series, load_files)
                     if !haskey(time_series, "load")
                         time_series["load"] = Dict()
                     end
-
                     if !haskey(time_series["load"], load_id)
                         time_series["load"][load_id] = Dict()
                     end
-
                     if !haskey(time_series["load"][load_id], "pd")
                         time_series["load"][load_id]["pd"] = Dict()
                     end
-
                     if !haskey(time_series["load"][load_id]["pd"], timestamp)
                         time_series["load"][load_id]["pd"][timestamp] = 0
                     end
-
                     time_series["load"][load_id]["pd"][timestamp] += load_value
                 end
             end
