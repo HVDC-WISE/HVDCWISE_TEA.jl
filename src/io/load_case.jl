@@ -32,13 +32,13 @@ function load_case(test_case_name)
 
     # Statuses file
     generation_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\generators_statuses.csv")
-    AC_lines_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\AC_lines_statuses.csv")
-    DC_lines_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\DC_lines_statuses.csv")
+    ac_lines_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\AC_lines_statuses.csv")
+    dc_lines_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\DC_lines_statuses.csv")
     converters_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\converters_statuses.csv")
-    pst_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\PST_statuses.csv")  # TODO process those data
-    storage_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\storage_statuses.csv")  # TODO process those data
+    pst_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\PST_statuses.csv")
+    storage_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\storage_statuses.csv")
 
-    time_series = Dict{String, Dict{String, Dict{String, Dict{String, Any}}}}(key => Dict() for key in ["gen", "load", "branch", "branchdc", "convdc"])
+    time_series = Dict{String, Dict{String, Dict{String, Dict{String, Any}}}}(key => Dict() for key in ["gen", "load", "branch", "branchdc", "convdc", "storage", "pst"])
         
     gen_files = [wind_gen_path,pv_gen_path,hydro_river_gen_path]
     load_files = [fix_loads_path,flex_loads_path]
@@ -47,6 +47,7 @@ function load_case(test_case_name)
     aggregate_generation_values!(time_series, gen_files)
     aggregate_loads_values!(time_series, load_files)
  
+    # Modifying the generation status with the timeseries data
     gen_statuses_data = read_csv_file(generation_statuses_path)[:,2:end]
     if !isempty(gen_statuses_data)
         for (_, col) in enumerate(names(gen_statuses_data))
@@ -54,16 +55,14 @@ function load_case(test_case_name)
                 timestamp = row_idx
                 gen_id = col
                 gen_status = value
-                time_series["gen"]["$gen_id"]["pmax"]["$timestamp"] = time_series["gen"]["$gen_id"]["pmax"]["$timestamp"]*gen_status
+                time_series["gen"]["$gen_id"]["pmax"]["$timestamp"] *= gen_status
             end
         end
     end
 
-    # get all rows of the 2nd column, the first row is the timestamp & the index of the AC line in the mpc.generator table in the .m file
-    AC_lines_statuses_data = read_csv_file(AC_lines_statuses_path)[:,2:end]
-
+    # Modifying the AC lines status with the timeseries data
+    AC_lines_statuses_data = read_csv_file(ac_lines_statuses_path)[:,2:end]
     if !isempty(AC_lines_statuses_data)
-        # Modifying the AC line status with the timeseries data
         for (_, col) in enumerate(names(AC_lines_statuses_data))
             for (row_idx, value) in enumerate(AC_lines_statuses_data[!, col])
                 timestamp = row_idx
@@ -81,9 +80,51 @@ function load_case(test_case_name)
             end
         end
     end
+
+    # Modifying the storage status with the timeseries data
+    storage_statuses_data = read_csv_file(storage_statuses_path)[:,2:end]
+    if !isempty(storage_statuses_data)
+        for (_, col) in enumerate(names(storage_statuses_data))
+            for (row_idx, value) in enumerate(storage_statuses_data[!, col])
+                timestamp = row_idx
+                storage_id = col
+                storage_status = value
+                if !haskey(time_series["storage"], "$storage_id")
+                    time_series["storage"]["$storage_id"]= Dict()
+                end
+                if !haskey(time_series["storage"]["$storage_id"], "status")
+                    time_series["storage"]["$storage_id"]["status"] = Dict()
+                end
+                if !haskey(time_series["storage"]["$storage_id"]["status"] , "$timestamp")
+                    time_series["storage"]["$storage_id"]["status"]["$timestamp"] = storage_status
+                end
+            end
+        end
+    end
+
+    # Modifying the pst status with the timeseries data
+    PST_statuses_data = read_csv_file(pst_statuses_path)[:,2:end]
+    if !isempty(PST_statuses_data)
+        for (_, col) in enumerate(names(PST_statuses_data))
+            for (row_idx, value) in enumerate(PST_statuses_data[!, col])
+                timestamp = row_idx
+                pst_id = col
+                pst_status = value
+                if !haskey(time_series["pst"], "$pst_id")
+                    time_series["pst"]["$pst_id"]= Dict()
+                end
+                if !haskey(time_series["pst"]["$pst_id"], "br_status")
+                    time_series["pst"]["$pst_id"]["br_status"] = Dict()
+                end
+                if !haskey(time_series["pst"]["$pst_id"]["br_status"] , "$timestamp")
+                    time_series["pst"]["$pst_id"]["br_status"]["$timestamp"] = pst_status
+                end
+            end
+        end
+    end
     
     # Modifying the DC lines status with the timeseries data
-    DC_line_statuses_data = read_csv_file(DC_lines_statuses_path)
+    DC_line_statuses_data = read_csv_file(dc_lines_statuses_path)
     if !isempty(DC_line_statuses_data)
         # Extract header information to check the phase order in the CSV
         header_phases_dc = [split(name, "_")[2] for name in names(DC_line_statuses_data)[2:end]]
@@ -152,7 +193,7 @@ function load_case(test_case_name)
         end
     end
 
-    global data = _HWTEA.parse_data(file, time_series) # read the data and add multinetwork dimension
+    data = _HWTEA.parse_data(file, time_series) # read the data and add multinetwork dimension
 
     # HVDCWiseTEA settings
     s = Dict("output" => Dict("branch_flows" => true, "duals" => true), "conv_losses_mp" => false)
