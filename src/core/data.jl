@@ -117,20 +117,3 @@ function find_value(data::Dict{String, <:Any})
         end
     end
 end
-
-function count_inner_keys(d::Dict)
-    if isempty(d)
-        return 0
-    end
-
-    inner_dict = d
-    while isa(inner_dict, Dict)
-        non_empty_keys = filter(x -> isa(inner_dict[x], Dict) && !isempty(inner_dict[x]), keys(inner_dict))
-        if isempty(non_empty_keys)
-            break
-        end
-        inner_dict = inner_dict[first(non_empty_keys)]
-    end
-
-    return length(keys(inner_dict))
-end

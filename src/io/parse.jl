@@ -41,8 +41,7 @@ function parse_data(file::String, time_series::Dict{String, <:Any}; kwargs...)
     # Parse initial single-network structure
     sn_data = parse_file(file; kwargs...)
     # Find number of simulated hours (a single dimension is used)
-    #hours = length(find_value(time_series))
-    hours = count_inner_keys(time_series)
+    hours = length(find_value(time_series))
     # Add hour dimension to single-network data
     _FP.add_dimension!(sn_data, :hour, hours)
     # Create the multinetwork data dictionary

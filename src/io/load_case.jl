@@ -60,13 +60,13 @@ function load_case(test_case_name)
                 gen_id = col
                 gen_status = value
                 if !haskey(time_series, "gen")
-                    time_series["gen"] = Dict()
+                    time_series["gen"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["gen"], "$gen_id")
-                    time_series["gen"]["$gen_id"]= Dict()
+                    time_series["gen"]["$gen_id"]= Dict{String, Any}()
                 end
                 if !haskey(time_series["gen"]["$gen_id"], "pmax")
-                    time_series["gen"]["$gen_id"]["pmax"] = Dict()
+                    time_series["gen"]["$gen_id"]["pmax"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["gen"]["$gen_id"]["pmax"] , "$timestamp")
                     time_series["gen"]["$gen_id"]["pmax"]["$timestamp"] = 1
@@ -85,13 +85,13 @@ function load_case(test_case_name)
                 branch_id = col
                 br_status = value
                 if !haskey(time_series, "branch")
-                    time_series["branch"] = Dict()
+                    time_series["branch"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["branch"], "$branch_id")
-                    time_series["branch"]["$branch_id"]= Dict()
+                    time_series["branch"]["$branch_id"]= Dict{String, Any}()
                 end
                 if !haskey(time_series["branch"]["$branch_id"], "br_status")
-                    time_series["branch"]["$branch_id"]["br_status"] = Dict()
+                    time_series["branch"]["$branch_id"]["br_status"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["branch"]["$branch_id"]["br_status"] , "$timestamp")
                     time_series["branch"]["$branch_id"]["br_status"]["$timestamp"] = br_status
@@ -109,13 +109,13 @@ function load_case(test_case_name)
                 storage_id = col
                 storage_status = value
                 if !haskey(time_series, "storage")
-                    time_series["storage"] = Dict()
+                    time_series["storage"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["storage"], "$storage_id")
-                    time_series["storage"]["$storage_id"]= Dict()
+                    time_series["storage"]["$storage_id"]= Dict{String, Any}()
                 end
                 if !haskey(time_series["storage"]["$storage_id"], "status")
-                    time_series["storage"]["$storage_id"]["status"] = Dict()
+                    time_series["storage"]["$storage_id"]["status"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["storage"]["$storage_id"]["status"] , "$timestamp")
                     time_series["storage"]["$storage_id"]["status"]["$timestamp"] = storage_status
@@ -136,10 +136,10 @@ function load_case(test_case_name)
                     time_series["pst"] = Dict()
                 end
                 if !haskey(time_series["pst"], "$pst_id")
-                    time_series["pst"]["$pst_id"]= Dict()
+                    time_series["pst"]["$pst_id"]= Dict{String, Any}()
                 end
                 if !haskey(time_series["pst"]["$pst_id"], "br_status")
-                    time_series["pst"]["$pst_id"]["br_status"] = Dict()
+                    time_series["pst"]["$pst_id"]["br_status"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["pst"]["$pst_id"]["br_status"] , "$timestamp")
                     time_series["pst"]["$pst_id"]["br_status"]["$timestamp"] = pst_status
@@ -171,13 +171,13 @@ function load_case(test_case_name)
                 
                 # Assign values to the corresponding fields
                 if !haskey(time_series, "branchdc")
-                    time_series["branchdc"] = Dict()
+                    time_series["branchdc"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["branchdc"], "$branchdc_id")
-                    time_series["branchdc"]["$branchdc_id"] = Dict()
+                    time_series["branchdc"]["$branchdc_id"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["branchdc"]["$branchdc_id"], "status")
-                    time_series["branchdc"]["$branchdc_id"]["status"] = Dict()
+                    time_series["branchdc"]["$branchdc_id"]["status"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["branchdc"]["$branchdc_id"]["status"] , "$timestamp")
                     time_series["branchdc"]["$branchdc_id"]["status"]["$timestamp"] = [status_p, status_n, status_r]
@@ -209,13 +209,13 @@ function load_case(test_case_name)
 
                 # Assign values to the corresponding fields
                 if !haskey(time_series, "convdc")
-                    time_series["convdc"] = Dict()
+                    time_series["convdc"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["convdc"], "$conv_id")
-                    time_series["convdc"]["$conv_id"] = Dict()
+                    time_series["convdc"]["$conv_id"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["convdc"]["$conv_id"], "status")
-                    time_series["convdc"]["$conv_id"]["status"] = Dict()
+                    time_series["convdc"]["$conv_id"]["status"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["convdc"]["$conv_id"]["status"] , "$timestamp")
                     time_series["convdc"]["$conv_id"]["status"]["$timestamp"] = [status_p, status_n]
@@ -223,8 +223,6 @@ function load_case(test_case_name)
             end
         end
     end
-
-    print(time_series)
 
     global data = _HWTEA.parse_data(file, time_series) # read the data and add multinetwork dimension
 
@@ -267,13 +265,13 @@ function aggregate_generation_values!(time_series, gen_files)
 
                     # Update time_series with aggregated generation values using haskey
                     if !haskey(time_series, "gen")
-                        time_series["gen"] = Dict()
+                        time_series["gen"] = Dict{String, Any}()
                     end
                     if !haskey(time_series["gen"], gen_id)
-                        time_series["gen"][gen_id] = Dict()
+                        time_series["gen"][gen_id] = Dict{String, Any}()
                     end
                     if !haskey(time_series["gen"][gen_id], "pmax")
-                        time_series["gen"][gen_id]["pmax"] = Dict()
+                        time_series["gen"][gen_id]["pmax"] = Dict{String, Any}()
                     end
                     if !haskey(time_series["gen"][gen_id]["pmax"], timestamp)
                         time_series["gen"][gen_id]["pmax"][timestamp] = 0
@@ -303,13 +301,13 @@ function aggregate_loads_values!(time_series, load_files)
 
                     # Update time_series with aggregated generation values using haskey
                     if !haskey(time_series, "load")
-                        time_series["load"] = Dict()
+                        time_series["load"] = Dict{String, Any}()
                     end
                     if !haskey(time_series["load"], load_id)
-                        time_series["load"][load_id] = Dict()
+                        time_series["load"][load_id] = Dict{String, Any}()
                     end
                     if !haskey(time_series["load"][load_id], "pd")
-                        time_series["load"][load_id]["pd"] = Dict()
+                        time_series["load"][load_id]["pd"] = Dict{String, Any}()
                     end
                     if !haskey(time_series["load"][load_id]["pd"], timestamp)
                         time_series["load"][load_id]["pd"][timestamp] = 0
