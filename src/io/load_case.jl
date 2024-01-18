@@ -11,14 +11,14 @@ import HVDCWISE_TEA as _HWTEA
 const _HWTEA_dir = dirname(dirname(pathof(_HWTEA))) # Root directory of HVDCWISE_TEA package
 
 function load_case(test_case_name)
-    # define optimizer
-    optimizer = _HWTEA.optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false) # linear solver
+    # define optimizer linear solver
+    optimizer = _HWTEA.optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false)
 
     ## Load test case
     file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.m_files\\$test_case_name.m")
 
     ## Read CSV files
-    # Generation related files
+    # Non-dispatchable generation related files
     wind_gen_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\wind_MW.csv")
     pv_gen_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\pv_MW.csv")
     hydro_river_gen_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\hydro_river_MW.csv")
@@ -27,8 +27,9 @@ function load_case(test_case_name)
     fix_loads_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\loads_fix_MW.csv")
     flex_loads_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\loads_flex_MW.csv")
 
-    # Generation\Load related file
-    hydro_dam_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\hydro_dam_MW.csv")  # TODO process those data
+    # Storage related file
+    # TODO process those data into time_series["storage"]["id"]["stationary_energy_inflow\outflow"]["timestamp"] (inflow = X & outflow = 0 if X>=0, else outflow = -X & inflow = 0 )
+    hydro_dam_storage_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\hydro_dam_MW.csv")
 
     # Statuses file
     generation_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\generators_statuses.csv")
@@ -38,14 +39,17 @@ function load_case(test_case_name)
     pst_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\PST_statuses.csv")
     storage_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\storage_statuses.csv")
 
-    time_series = Dict{String, Dict{String, Dict{String, Dict{String, Any}}}}(key => Dict() for key in ["gen", "load", "branch", "branchdc", "convdc", "storage", "pst"])
+    
+    global time_series = Dict{String, Any}()
         
     gen_files = [wind_gen_path,pv_gen_path,hydro_river_gen_path]
     load_files = [fix_loads_path,flex_loads_path]
 
     # Aggregate  values for each file type
+    #TODO do not sum, just update time_series["gen"]["id"]["pmax"]["timestamp"]
     aggregate_generation_values!(time_series, gen_files)
-    aggregate_loads_values!(time_series, load_files)
+    #TODO do not sum, just update time_series["load"]["id"]["pd"]["timestamp"]
+    aggregate_loads_values!(time_series, load_files) 
  
     # Modifying the generation status with the timeseries data
     gen_statuses_data = read_csv_file(generation_statuses_path)[:,2:end]
@@ -55,7 +59,19 @@ function load_case(test_case_name)
                 timestamp = row_idx
                 gen_id = col
                 gen_status = value
-                time_series["gen"]["$gen_id"]["pmax"]["$timestamp"] *= gen_status
+                if !haskey(time_series, "gen")
+                    time_series["gen"] = Dict()
+                end
+                if !haskey(time_series["gen"], "$gen_id")
+                    time_series["gen"]["$gen_id"]= Dict()
+                end
+                if !haskey(time_series["gen"]["$gen_id"], "pmax")
+                    time_series["gen"]["$gen_id"]["pmax"] = Dict()
+                end
+                if !haskey(time_series["gen"]["$gen_id"]["pmax"] , "$timestamp")
+                    time_series["gen"]["$gen_id"]["pmax"]["$timestamp"] = 1
+                end
+                time_series["gen"]["$gen_id"]["pmax"]["$timestamp"] *= gen_status 
             end
         end
     end
@@ -68,6 +84,9 @@ function load_case(test_case_name)
                 timestamp = row_idx
                 branch_id = col
                 br_status = value
+                if !haskey(time_series, "branch")
+                    time_series["branch"] = Dict()
+                end
                 if !haskey(time_series["branch"], "$branch_id")
                     time_series["branch"]["$branch_id"]= Dict()
                 end
@@ -89,6 +108,9 @@ function load_case(test_case_name)
                 timestamp = row_idx
                 storage_id = col
                 storage_status = value
+                if !haskey(time_series, "storage")
+                    time_series["storage"] = Dict()
+                end
                 if !haskey(time_series["storage"], "$storage_id")
                     time_series["storage"]["$storage_id"]= Dict()
                 end
@@ -110,6 +132,9 @@ function load_case(test_case_name)
                 timestamp = row_idx
                 pst_id = col
                 pst_status = value
+                if !haskey(time_series, "pst")
+                    time_series["pst"] = Dict()
+                end
                 if !haskey(time_series["pst"], "$pst_id")
                     time_series["pst"]["$pst_id"]= Dict()
                 end
@@ -145,6 +170,9 @@ function load_case(test_case_name)
                 status_r = dc_line_statuses_data[row_idx, col_group_idx + 3] # metallic return phase is the third column of the group
                 
                 # Assign values to the corresponding fields
+                if !haskey(time_series, "branchdc")
+                    time_series["branchdc"] = Dict()
+                end
                 if !haskey(time_series["branchdc"], "$branchdc_id")
                     time_series["branchdc"]["$branchdc_id"] = Dict()
                 end
@@ -180,6 +208,9 @@ function load_case(test_case_name)
                 status_n = converters_statuses_data[row_idx, col_group_idx + 2] # negative converter is the second column of the group
 
                 # Assign values to the corresponding fields
+                if !haskey(time_series, "convdc")
+                    time_series["convdc"] = Dict()
+                end
                 if !haskey(time_series["convdc"], "$conv_id")
                     time_series["convdc"]["$conv_id"] = Dict()
                 end
@@ -193,7 +224,9 @@ function load_case(test_case_name)
         end
     end
 
-    data = _HWTEA.parse_data(file, time_series) # read the data and add multinetwork dimension
+    print(time_series)
+
+    global data = _HWTEA.parse_data(file, time_series) # read the data and add multinetwork dimension
 
     # HVDCWiseTEA settings
     s = Dict("output" => Dict("branch_flows" => true, "duals" => true), "conv_losses_mp" => false)
