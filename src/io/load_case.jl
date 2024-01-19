@@ -56,7 +56,7 @@ function load_case(test_case_name)
     if !isempty(gen_statuses_data)
         for (_, col) in enumerate(names(gen_statuses_data))
             for (row_idx, value) in enumerate(gen_statuses_data[!, col])
-                timestamp = row_idx
+                timestamp= Int64(row_idx)
                 gen_id = col
                 gen_status = value
                 if !haskey(time_series, "gen")
@@ -65,13 +65,14 @@ function load_case(test_case_name)
                 if !haskey(time_series["gen"], "$gen_id")
                     time_series["gen"]["$gen_id"]= Dict{String, Any}()
                 end
-                if !haskey(time_series["gen"]["$gen_id"], "pmax")
-                    time_series["gen"]["$gen_id"]["pmax"] = Dict{String, Any}()
+                if !haskey(time_series["gen"]["$gen_id"], "gen_status")
+                    time_series["gen"]["$gen_id"]["gen_status"] = Vector{Any}()
                 end
-                if !haskey(time_series["gen"]["$gen_id"]["pmax"] , "$timestamp")
-                    time_series["gen"]["$gen_id"]["pmax"]["$timestamp"] = 1
+                # Make sure the vector is large enough to accommodate the timestamp
+                while length(time_series["gen"][gen_id]["gen_status"]) < timestamp
+                    push!(time_series["gen"][gen_id]["gen_status"], 1)
                 end
-                time_series["gen"]["$gen_id"]["pmax"]["$timestamp"] *= gen_status 
+                time_series["gen"]["$gen_id"]["gen_status"][timestamp] = gen_status 
             end
         end
     end
@@ -81,7 +82,7 @@ function load_case(test_case_name)
     if !isempty(ac_lines_statuses_data)
         for (_, col) in enumerate(names(ac_lines_statuses_data))
             for (row_idx, value) in enumerate(ac_lines_statuses_data[!, col])
-                timestamp = row_idx
+                timestamp = Int64(row_idx)
                 branch_id = col
                 br_status = value
                 if !haskey(time_series, "branch")
@@ -91,11 +92,13 @@ function load_case(test_case_name)
                     time_series["branch"]["$branch_id"]= Dict{String, Any}()
                 end
                 if !haskey(time_series["branch"]["$branch_id"], "br_status")
-                    time_series["branch"]["$branch_id"]["br_status"] = Dict{String, Any}()
+                    time_series["branch"]["$branch_id"]["br_status"] = Vector{Any}()
                 end
-                if !haskey(time_series["branch"]["$branch_id"]["br_status"] , "$timestamp")
-                    time_series["branch"]["$branch_id"]["br_status"]["$timestamp"] = br_status
+                # Make sure the vector is large enough to accommodate the timestamp
+                while length(time_series["branch"]["$branch_id"]["br_status"]) < timestamp
+                    push!(time_series["branch"]["$branch_id"]["br_status"], 1)
                 end
+                time_series["branch"]["$branch_id"]["br_status"][timestamp] = br_status
             end
         end
     end
@@ -105,7 +108,7 @@ function load_case(test_case_name)
     if !isempty(storage_statuses_data)
         for (_, col) in enumerate(names(storage_statuses_data))
             for (row_idx, value) in enumerate(storage_statuses_data[!, col])
-                timestamp = row_idx
+                timestamp = Int64(row_idx)
                 storage_id = col
                 storage_status = value
                 if !haskey(time_series, "storage")
@@ -115,11 +118,13 @@ function load_case(test_case_name)
                     time_series["storage"]["$storage_id"]= Dict{String, Any}()
                 end
                 if !haskey(time_series["storage"]["$storage_id"], "status")
-                    time_series["storage"]["$storage_id"]["status"] = Dict{String, Any}()
+                    time_series["storage"]["$storage_id"]["status"] = Vector{Any}()
                 end
-                if !haskey(time_series["storage"]["$storage_id"]["status"] , "$timestamp")
-                    time_series["storage"]["$storage_id"]["status"]["$timestamp"] = storage_status
+                # Make sure the vector is large enough to accommodate the timestamp
+                while length(time_series["storage"]["$storage_id"]["status"]) < timestamp
+                    push!(time_series["storage"]["$storage_id"]["status"], 1)
                 end
+                time_series["storage"]["$storage_id"]["status"][timestamp] = storage_status
             end
         end
     end
@@ -129,7 +134,7 @@ function load_case(test_case_name)
     if !isempty(pst_statuses_data)
         for (_, col) in enumerate(names(pst_statuses_data))
             for (row_idx, value) in enumerate(pst_statuses_data[!, col])
-                timestamp = row_idx
+                timestamp = Int64(row_idx)
                 pst_id = col
                 pst_status = value
                 if !haskey(time_series, "pst")
@@ -139,11 +144,13 @@ function load_case(test_case_name)
                     time_series["pst"]["$pst_id"]= Dict{String, Any}()
                 end
                 if !haskey(time_series["pst"]["$pst_id"], "br_status")
-                    time_series["pst"]["$pst_id"]["br_status"] = Dict{String, Any}()
+                    time_series["pst"]["$pst_id"]["br_status"] = Vector{Any}()
                 end
-                if !haskey(time_series["pst"]["$pst_id"]["br_status"] , "$timestamp")
-                    time_series["pst"]["$pst_id"]["br_status"]["$timestamp"] = pst_status
+                # Make sure the vector is large enough to accommodate the timestamp
+                while length(time_series["pst"]["$pst_id"]["br_status"]) < timestamp
+                    push!(time_series["pst"]["$pst_id"]["br_status"], 1)
                 end
+                time_series["pst"]["$pst_id"]["br_status"][timestamp] = pst_status
             end
         end
     end
@@ -159,7 +166,8 @@ function load_case(test_case_name)
             error("Unexpected phase order in DC line status file header.\n Order X_+;X_-;X_MR for component X expected")
         end
 
-        for (row_idx, timestamp) in enumerate(dc_line_statuses_data[!, 1])
+        for (row_idx, timestamp_str) in enumerate(dc_line_statuses_data[!, 1])
+            timestamp = Int64(timestamp_str)
             for col_group_idx in 1:3:size(dc_line_statuses_data, 2)-2  # iterating by group of 3 columns (+, - , MR) for each DC lines
                 # Branchdc_id is inferred from the column index
                 branchdc_id = div(col_group_idx, 3) + 1
@@ -177,11 +185,13 @@ function load_case(test_case_name)
                     time_series["branchdc"]["$branchdc_id"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["branchdc"]["$branchdc_id"], "status")
-                    time_series["branchdc"]["$branchdc_id"]["status"] = Dict{String, Any}()
+                    time_series["branchdc"]["$branchdc_id"]["status"] = Vector{Any}()
                 end
-                if !haskey(time_series["branchdc"]["$branchdc_id"]["status"] , "$timestamp")
-                    time_series["branchdc"]["$branchdc_id"]["status"]["$timestamp"] = [status_p, status_n, status_r]
+                # Make sure the vector is large enough to accommodate the timestamp
+                while length(time_series["branchdc"]["$branchdc_id"]["status"]) < timestamp
+                    push!(time_series["branchdc"]["$branchdc_id"]["status"], 1)
                 end
+                time_series["branchdc"]["$branchdc_id"]["status"][timestamp] = [status_p, status_n, status_r]
             end
         end
     end
@@ -198,7 +208,8 @@ function load_case(test_case_name)
             error("Unexpected phase order in converter status file header.\n Order X_+;X_-; for component X expected")
         end
 
-        for (row_idx, timestamp) in enumerate(converters_statuses_data[!, 1])
+        for (row_idx, timestamp_str) in enumerate(converters_statuses_data[!, 1])
+            timestamp = Int64(timestamp_str)
             for col_group_idx in 1:2:size(converters_statuses_data, 2)-1 # iterating by group of 2 columns (+, -) for each AC/DC conv
                 # Conv_id is inferred from the column index
                 conv_id = div(col_group_idx, 2) + 1
@@ -215,11 +226,13 @@ function load_case(test_case_name)
                     time_series["convdc"]["$conv_id"] = Dict{String, Any}()
                 end
                 if !haskey(time_series["convdc"]["$conv_id"], "status")
-                    time_series["convdc"]["$conv_id"]["status"] = Dict{String, Any}()
+                    time_series["convdc"]["$conv_id"]["status"] = Vector{Any}()
                 end
-                if !haskey(time_series["convdc"]["$conv_id"]["status"] , "$timestamp")
-                    time_series["convdc"]["$conv_id"]["status"]["$timestamp"] = [status_p, status_n]
+                # Make sure the vector is large enough to accommodate the timestamp
+                while length(time_series["convdc"]["$conv_id"]["status"]) < timestamp
+                    push!(time_series["convdc"]["$conv_id"]["status"], 1)
                 end
+                time_series["convdc"]["$conv_id"]["status"][timestamp] = [status_p, status_n]
             end
         end
     end
@@ -254,8 +267,8 @@ function aggregate_generation_values!(time_series, gen_files)
         if !isempty(gen_data)
             # Extract generator IDs (excluding the first column 'Time')
             gen_ids = string.(names(gen_data[:, 2:end]))
-            # Convert timestamp symbols to strings
-            timestamps = string.(gen_data.Time)
+            # Extract timestamps
+            timestamps = gen_data.Time
 
             # Iterate over timestamps
             for (timestamp_idx, timestamp) in enumerate(timestamps)
@@ -271,12 +284,15 @@ function aggregate_generation_values!(time_series, gen_files)
                         time_series["gen"][gen_id] = Dict{String, Any}()
                     end
                     if !haskey(time_series["gen"][gen_id], "pmax")
-                        time_series["gen"][gen_id]["pmax"] = Dict{String, Any}()
+                        time_series["gen"][gen_id]["pmax"] = Vector{Any}()
                     end
-                    if !haskey(time_series["gen"][gen_id]["pmax"], timestamp)
-                        time_series["gen"][gen_id]["pmax"][timestamp] = 0
+                    
+                    # Make sure the vector is large enough to accommodate the timestamp
+                    while length(time_series["gen"][gen_id]["pmax"]) < timestamp
+                        push!(time_series["gen"][gen_id]["pmax"], 0)
                     end
-                    time_series["gen"][gen_id]["pmax"][timestamp] += gen_value
+                    
+                    time_series["gen"][gen_id]["pmax"][timestamp] += gen_value                    
                 end
             end
         end
@@ -290,8 +306,8 @@ function aggregate_loads_values!(time_series, load_files)
         if !isempty(load_data)
             # Extract generator IDs (excluding the first column 'Time')
             load_ids = string.(names(load_data[:, 2:end]))
-            # Convert timestamp symbols to strings
-            timestamps = string.(load_data.Time)
+            # Extract timestamps
+            timestamps = load_data.Time
 
             # Iterate over timestamps
             for (timestamp_idx, timestamp) in enumerate(timestamps)
@@ -307,10 +323,11 @@ function aggregate_loads_values!(time_series, load_files)
                         time_series["load"][load_id] = Dict{String, Any}()
                     end
                     if !haskey(time_series["load"][load_id], "pd")
-                        time_series["load"][load_id]["pd"] = Dict{String, Any}()
+                        time_series["load"][load_id]["pd"] = Vector{Any}()
                     end
-                    if !haskey(time_series["load"][load_id]["pd"], timestamp)
-                        time_series["load"][load_id]["pd"][timestamp] = 0
+                    # Make sure the vector is large enough to accommodate the timestamp
+                    while length(time_series["load"][load_id]["pd"]) < timestamp
+                        push!(time_series["load"][load_id]["pd"], 0)
                     end
                     time_series["load"][load_id]["pd"][timestamp] += load_value
                 end

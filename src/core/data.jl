@@ -106,7 +106,7 @@ function _add_pst_data!(data::Dict{String, Any})
 end
 
 
-function find_value(data::Dict{String, <:Any})
+function find_value(data::Dict{<:Any, <:Any})
 
     for (_, value) in data
         if isa(value, Dict)
