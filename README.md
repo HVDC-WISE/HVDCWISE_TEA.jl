@@ -13,7 +13,7 @@ The package builds upon the [PowerModels](https://github.com/lanl-ansi/PowerMode
 
 
 ## How to setup the environment to run the project?
-To activate the virtual environment of this project (in a julia terminal): 
+To activate the virtual environment of this project (in a **_julia terminal_**): 
 
 ]
 activate my\personnal\path\to\HVDCWISE_TEA.jl

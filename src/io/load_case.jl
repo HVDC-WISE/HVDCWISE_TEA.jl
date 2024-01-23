@@ -19,6 +19,7 @@ function load_case(test_case_name)
 
     ## Read CSV files
     # Non-dispatchable generation related files
+    #TODO read only the ndgenerators_MW.csv file for the ndgen CSV data
     wind_gen_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\wind_MW.csv")
     pv_gen_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\pv_MW.csv")
     hydro_river_gen_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\hydro_river_MW.csv")
