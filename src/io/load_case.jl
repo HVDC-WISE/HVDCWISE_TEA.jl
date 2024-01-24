@@ -26,8 +26,7 @@ function load_case(test_case_name)
     flex_loads_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\loads_flex_MW.csv")
 
     # Storage related file
-    # TODO process those data into time_series["storage"]["id"]["stationary_energy_inflow\outflow"]["timestamp"] (inflow = X & outflow = 0 if X>=0, else outflow = -X & inflow = 0 )
-    hydro_dam_storage_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\hydro_dam_MW.csv")
+    hydro_dam_storage_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\storages_energy_inflow.csv")
 
     # Statuses file
     generation_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\generators_statuses.csv")
@@ -69,7 +68,43 @@ function load_case(test_case_name)
 
     # Setting generation and load values
     set_generation_values!(time_series, ndgen_path, gen_statuses_data)
-    set_loads_values!(time_series, load_files) 
+    set_loads_values!(time_series, load_files)
+
+    # Modifying the storage energy inflow/outflow with the timeseries data
+    hydro_dam_storage_data = read_csv_file(hydro_dam_storage_path)[:,2:end]
+    if !isempty(hydro_dam_storage_data)
+        for (_, col) in enumerate(names(hydro_dam_storage_data))
+            for (row_idx, value) in enumerate(hydro_dam_storage_data[!, col])
+                timestamp = Int64(row_idx)
+                storage_id = col
+                storage_value = value
+                if !haskey(time_series, "storage")
+                    time_series["storage"] = Dict{String, Any}()
+                end
+                if !haskey(time_series["storage"], "$storage_id")
+                    time_series["storage"]["$storage_id"]= Dict{String, Any}()
+                end
+                if !haskey(time_series["storage"]["$storage_id"], "stationary_energy_inflow")
+                    time_series["storage"]["$storage_id"]["stationary_energy_inflow"] = Vector{Any}()
+                end
+                if !haskey(time_series["storage"]["$storage_id"], "stationary_energy_outflow")
+                    time_series["storage"]["$storage_id"]["stationary_energy_outflow"] = Vector{Any}()
+                end
+                # Make sure the vector is large enough to accommodate the timestamp
+                while length(time_series["storage"]["$storage_id"]["stationary_energy_inflow"]) < timestamp
+                    push!(time_series["storage"]["$storage_id"]["stationary_energy_inflow"], 0)
+                end
+                while length(time_series["storage"]["$storage_id"]["stationary_energy_outflow"]) < timestamp
+                    push!(time_series["storage"]["$storage_id"]["stationary_energy_outflow"], 0)
+                end
+                if storage_value >= 0
+                    time_series["storage"]["$storage_id"]["stationary_energy_inflow"][timestamp] += storage_value
+                else
+                    time_series["storage"]["$storage_id"]["stationary_energy_outflow"][timestamp] += storage_value
+                end
+            end
+        end
+    end
 
     # Modifying the AC lines status with the timeseries data
     ac_lines_statuses_data = read_csv_file(ac_lines_statuses_path)[:,2:end]
