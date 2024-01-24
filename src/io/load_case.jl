@@ -19,10 +19,7 @@ function load_case(test_case_name)
 
     ## Read CSV files
     # Non-dispatchable generation related files
-    #TODO read only the ndgenerators_MW.csv file for the ndgen CSV data
-    wind_gen_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\wind_MW.csv")
-    pv_gen_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\pv_MW.csv")
-    hydro_river_gen_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\hydro_river_MW.csv")
+    ndgen_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\ndgenerators_MW.csv")
 
     # Load related files
     fix_loads_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\loads_fix_MW.csv")
@@ -39,18 +36,10 @@ function load_case(test_case_name)
     converters_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\converters_statuses.csv")
     pst_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\PST_statuses.csv")
     storage_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\storage_statuses.csv")
-
     
     global time_series = Dict{String, Any}()
         
-    gen_files = [wind_gen_path,pv_gen_path,hydro_river_gen_path]
     load_files = [fix_loads_path,flex_loads_path]
-
-    # Aggregate  values for each file type
-    #TODO do not sum, just update time_series["gen"]["id"]["pmax"]["timestamp"]
-    aggregate_generation_values!(time_series, gen_files)
-    #TODO do not sum, just update time_series["load"]["id"]["pd"]["timestamp"]
-    aggregate_loads_values!(time_series, load_files) 
  
     # Modifying the generation status with the timeseries data
     gen_statuses_data = read_csv_file(generation_statuses_path)[:,2:end]
@@ -77,6 +66,10 @@ function load_case(test_case_name)
             end
         end
     end
+
+    # Setting generation and load values
+    set_generation_values!(time_series, ndgen_path, gen_statuses_data)
+    set_loads_values!(time_series, load_files) 
 
     # Modifying the AC lines status with the timeseries data
     ac_lines_statuses_data = read_csv_file(ac_lines_statuses_path)[:,2:end]
@@ -261,47 +254,67 @@ function read_csv_file(file_path)
     end
 end
 
-# Function to aggregrate the generation values of the several generation files
-function aggregate_generation_values!(time_series, gen_files)
-    for gen_file in gen_files
-        gen_data = read_csv_file(gen_file)
-        if !isempty(gen_data)
-            # Extract generator IDs (excluding the first column 'Time')
-            gen_ids = string.(names(gen_data[:, 2:end]))
-            # Extract timestamps
-            timestamps = gen_data.Time
+# Function to set the generation values accordingt to generation files
+function set_generation_values!(time_series, gen_file, gen_statuses_data)    
+    gen_data = read_csv_file(gen_file)
+    if !isempty(gen_data)
+        # Extract generator IDs (excluding the first column 'Time')
+        gen_ids = string.(names(gen_data[:, 2:end]))
+        # Extract timestamps
+        timestamps = gen_data.Time
 
-            # Iterate over timestamps
-            for (timestamp_idx, timestamp) in enumerate(timestamps)
-                # Iterate over generator IDs
-                for (gen_id_idx, gen_id) in enumerate(gen_ids)
-                    gen_value = gen_data[!, gen_id_idx + 1][timestamp_idx]  # Extract gen_value for the current gen_id
+        # Iterate over timestamps
+        for (timestamp_idx, timestamp) in enumerate(timestamps)
+            # Iterate over generator IDs
+            for (gen_id_idx, gen_id) in enumerate(gen_ids)
+                gen_value = gen_data[!, gen_id_idx + 1][timestamp_idx]  # Extract gen_value for the current gen_id
 
-                    # Update time_series with aggregated generation values using haskey
-                    if !haskey(time_series, "gen")
-                        time_series["gen"] = Dict{String, Any}()
-                    end
-                    if !haskey(time_series["gen"], gen_id)
-                        time_series["gen"][gen_id] = Dict{String, Any}()
-                    end
-                    if !haskey(time_series["gen"][gen_id], "pmax")
-                        time_series["gen"][gen_id]["pmax"] = Vector{Any}()
-                    end
-                    
-                    # Make sure the vector is large enough to accommodate the timestamp
-                    while length(time_series["gen"][gen_id]["pmax"]) < timestamp
-                        push!(time_series["gen"][gen_id]["pmax"], 0)
-                    end
-                    
-                    time_series["gen"][gen_id]["pmax"][timestamp] += gen_value                    
+                # Update time_series with aggregated generation values using haskey
+                if !haskey(time_series, "gen")
+                    time_series["gen"] = Dict{String, Any}()
                 end
+                if !haskey(time_series["gen"], gen_id)
+                    time_series["gen"][gen_id] = Dict{String, Any}()
+                end
+                if !haskey(time_series["gen"][gen_id], "pmax")
+                    time_series["gen"][gen_id]["pmax"] = Vector{Any}()
+                end
+                if !haskey(time_series["gen"][gen_id], "gen_status")
+                    time_series["gen"][gen_id]["gen_status"] = Vector{Any}()
+                end
+
+                # Make sure the vectors are large enough to accommodate the timestamp
+                while length(time_series["gen"][gen_id]["pmax"]) < timestamp
+                    push!(time_series["gen"][gen_id]["pmax"], 0)
+                end
+                while length(time_series["gen"][gen_id]["gen_status"]) < timestamp
+                    push!(time_series["gen"][gen_id]["gen_status"], 1)
+                end
+                
+                if !isempty(gen_statuses_data)
+                    # Check gen_status at the current timestamp
+                    gen_status = gen_statuses_data[!, gen_id][timestamp_idx]
+
+                    if gen_status == 1
+                        # Set pmax if gen_status is 1
+                        time_series["gen"][gen_id]["pmax"][timestamp] += gen_value
+                    else
+                        # Set gen_status if gen_status is not 1
+                        time_series["gen"][gen_id]["gen_status"][timestamp] = 0
+                    end
+                else
+                    # Set pmax
+                    time_series["gen"][gen_id]["pmax"][timestamp] += gen_value
+                end        
             end
         end
     end
 end
 
-# Function to aggregrate the loads values of the several load files
-function aggregate_loads_values!(time_series, load_files)
+
+
+# Function to set the loads values of the several load files
+function set_loads_values!(time_series, load_files)
     for load_file in load_files
         load_data = read_csv_file(load_file)
         if !isempty(load_data)
@@ -314,7 +327,7 @@ function aggregate_loads_values!(time_series, load_files)
             for (timestamp_idx, timestamp) in enumerate(timestamps)
                 # Iterate over generator IDs
                 for (load_id_idx, load_id) in enumerate(load_ids)
-                    load_value = load_data[!, load_id_idx + 1][timestamp_idx]  # Extract gen_value for the current gen_id
+                    load_value = load_data[!, load_id_idx + 1][timestamp_idx]  # Extract load_value for the current gen_id
 
                     # Update time_series with aggregated generation values using haskey
                     if !haskey(time_series, "load")
