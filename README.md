@@ -13,12 +13,46 @@ The package builds upon the [PowerModels](https://github.com/lanl-ansi/PowerMode
 
 
 ## How to setup the environment to run the project?
-To activate the virtual environment of this project (in a **_julia terminal_**): 
+To activate the virtual environment of this project, open a new terminal and enter the Julia REPL by typing:
+
+```
+julia
+```
+Upon successful entry, you should see the Julia REPL prompt:
+
+```
+
+               _
+   _       _ _(_)_     |  Documentation: https://docs.julialang.org
+  (_)     | (_) (_)    |
+   _ _   _| |_  __ _   |  Type "?" for help, "]?" for Pkg help.    
+  | | | | | | |/ _` |  |
+  | | |_| | | | (_| |  |  Version 1.8.3 (2022-11-14)
+ _/ |\__'_|_|_|\__'_|  |  Official https://julialang.org/ release  
+|__/                   |
+
+julia>
+```
+
+Next, within the ***Julia REPL***, enter the package manager by typing:
 
 ]
+You'll see the package manager prompt:
+```
+(@v1.8) pkg>
+```
+In the package manager prompt, activate the virtual environment by specifying the path to your HVDCWISE_TEA.jl project: 
+```
 activate my\personnal\path\to\HVDCWISE_TEA.jl
-instantiate
+```
+_Be sure to replace my\personnal\path\to\HVDCWISE_TEA.jl with the ***actual path*** to your HVDCWISE_TEA project._
 
+
+Finally, within the ***package manager prompt***, run:
+```
+instantiate
+```
+This command installs the project dependencies. You are now ready to work within the activated virtual environment.
 ## Development
 
 HVDCWISE_TEA.jl is early-stage, research-grade software under current development.
