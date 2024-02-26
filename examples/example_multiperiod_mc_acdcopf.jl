@@ -9,6 +9,7 @@ const _HWTEA_dir = dirname(dirname(pathof(_HWTEA))) # Root directory of HVDCWISE
 
 ## Time series
 
+hours = 24
 time_series = Dict{String, Any}(
     "gen" => Dict(
         "1" => Dict("gen_status" => fill(1, hours)),
@@ -32,8 +33,8 @@ time_series = Dict{String, Any}(
 
 ## Input parameters
 
-path = joinpath(_HWTEA_dir, "test/data/case5/case5_3grids_MC.m")
-data = _HWTEA.parse_data(path, time_series)
+path = joinpath(_HWTEA_dir, "test/data/grids/acdc/case5_3grids_MC.m")
+data = _HWTEA.parse_data(path)#, time_series)
 
 ## Solve the multiperiod OPF problem
 
