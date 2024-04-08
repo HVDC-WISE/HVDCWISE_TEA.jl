@@ -117,4 +117,8 @@ mpc.branchdc = [
                     1      4 0.052 0 0   100   100   100      1          2           2    0.052          0        1        1        1; % bipolar
                     2      4 0.052 0 0   100   100   100      1          2           2    0.052          0        1        1        1; % bipolar
                     3      4 0.052 0 0    50    50    50      1          1           2    0.052          2        0        1        1; % monopolar
+<<<<<<< HEAD:test/data/case5/case5_3grids_MC - curtailment.m
 ];
+=======
+];
+>>>>>>> origin/multi-period:test/data/grids/acdc/case5_3grids_MC - curtailment.m

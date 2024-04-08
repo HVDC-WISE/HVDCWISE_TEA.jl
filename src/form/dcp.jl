@@ -15,7 +15,7 @@ function constraint_power_balance_ac(pm::_PM.AbstractDCPModel, n::Int, i::Int, b
     cstr_p = JuMP.@constraint(pm.model,
         sum(p[a] for a in bus_arcs)
         + sum(ppst[a] for a in bus_arcs_pst)
-        + sum(sum(pconv_grid_ac[c][d] for d in 1:length(_PM.var(pm, n, :pconv_tf_fr, c))) for c in bus_convs_ac)
+        + sum(sum(pconv_grid_ac[c][d] for d in first(axes(_PM.var(pm, n, :pconv_tf_fr, c)))) for c in bus_convs_ac)
         ==
         sum(pg[g] for g in bus_gens)
         - sum(ps[s] for s in bus_storage)
