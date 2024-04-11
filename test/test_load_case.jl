@@ -74,7 +74,7 @@ include("../src/io/load_case.jl")
 
         if results_5 !== nothing
             @test results_5["termination_status"] == _HWTEA.OPTIMAL
-            @test results_5["objective"] ≈ 17688.889 rtol = 1e-3
+            @test results_5["objective"] ≈ 10450 rtol = 1e-3
             # t=1: Demand=8, Available=10 and storage is available -> 1 MW consumed by the storage & 8 MW by the load (pgcurt=1 MW)
             @test results_5["solution"]["nw"]["1"]["gen"]["1"]["pg"] ≈ 9/baseMVA atol=1e-3
             @test results_5["solution"]["nw"]["1"]["gen"]["1"]["pgcurt"] ≈ 1/baseMVA atol=1e-3

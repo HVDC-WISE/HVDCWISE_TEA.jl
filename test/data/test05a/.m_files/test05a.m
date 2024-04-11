@@ -11,7 +11,7 @@ mpc.time_elapsed = 1.0;
 % AC buses
 % bus_i type Pd Qd Gs Bs area Vm Va baseKV zone Vmax Vmin
 mpc.bus = [
-1 1 10 0 0 0 1 1 0 400 1 1.1 0.9;
+1 1 100 0 0 0 1 1 0 400 1 1.1 0.9;
 2 2 0 0 0 0 1 1 0 400 1 1.1 0.9;
 3 1 0 0 0 0 1 1 0 400 1 1.1 0.9;
 ];
