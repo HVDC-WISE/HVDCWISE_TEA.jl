@@ -7,8 +7,9 @@ import CSV
 using  DataFrames
 import HiGHS
 import HVDCWISE_TEA as _HWTEA
+import InfrastructureModels as _IM
 
-const _HWTEA_dir = dirname(dirname(pathof(_HWTEA))) # Root directory of HVDCWISE_TEA package
+# const _HWTEA_dir = dirname(dirname(pathof(_HWTEA))) # Root directory of HVDCWISE_TEA package
 
 function load_case(test_case_name)
     # define optimizer linear solver
@@ -16,6 +17,12 @@ function load_case(test_case_name)
 
     ## Load test case
     file = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.m_files\\$test_case_name.m")
+    # io = open(file)
+    # file_string_data = read(io, String)
+    file_string_data = read(open(file), String)
+    file_dict_data = _IM.parse_matlab_string(file_string_data, extended=true)[1];
+    baseMVA = file_dict_data["mpc.baseMVA"]
+
 
     ## Read CSV files
     # Non-dispatchable generation related files
@@ -26,7 +33,7 @@ function load_case(test_case_name)
     flex_loads_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\loads_flex_MW.csv")
 
     # Storage related file
-    hydro_dam_storage_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\storages_energy_inflow.csv")
+    storage_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\storages_energy_inflow.csv")
 
     # Statuses file
     generation_statuses_path = joinpath(_HWTEA_dir, "test\\data\\$test_case_name\\.csv_files\\generators_statuses.csv")
@@ -68,16 +75,16 @@ function load_case(test_case_name)
 
     # Setting generation and load values
     set_generation_values!(time_series, ndgen_path, gen_statuses_data)
-    set_loads_values!(time_series, load_files)
+    set_loads_values!(time_series, load_files, baseMVA)
 
     # Modifying the storage energy inflow/outflow with the timeseries data
-    hydro_dam_storage_data = read_csv_file(hydro_dam_storage_path)[:,2:end]
-    if !isempty(hydro_dam_storage_data)
-        for (_, col) in enumerate(names(hydro_dam_storage_data))
-            for (row_idx, value) in enumerate(hydro_dam_storage_data[!, col])
+    storage_data = read_csv_file(storage_path)[:,2:end]
+    if !isempty(storage_data)
+        for (_, col) in enumerate(names(storage_data))
+            for (row_idx, value) in enumerate(storage_data[!, col])
                 timestamp = Int64(row_idx)
                 storage_id = col
-                storage_value = value
+                storage_net_inflow_pu = value / baseMVA
                 if !haskey(time_series, "storage")
                     time_series["storage"] = Dict{String, Any}()
                 end
@@ -97,10 +104,10 @@ function load_case(test_case_name)
                 while length(time_series["storage"]["$storage_id"]["stationary_energy_outflow"]) < timestamp
                     push!(time_series["storage"]["$storage_id"]["stationary_energy_outflow"], 0)
                 end
-                if storage_value >= 0
-                    time_series["storage"]["$storage_id"]["stationary_energy_inflow"][timestamp] += storage_value
+                if storage_net_inflow_pu >= 0
+                    time_series["storage"]["$storage_id"]["stationary_energy_inflow"][timestamp] += storage_net_inflow_pu
                 else
-                    time_series["storage"]["$storage_id"]["stationary_energy_outflow"][timestamp] += storage_value
+                    time_series["storage"]["$storage_id"]["stationary_energy_outflow"][timestamp] -= storage_net_inflow_pu
                 end
             end
         end
@@ -349,7 +356,7 @@ end
 
 
 # Function to set the loads values of the several load files
-function set_loads_values!(time_series, load_files)
+function set_loads_values!(time_series, load_files, baseMVA)
     for load_file in load_files
         load_data = read_csv_file(load_file)
         if !isempty(load_data)
@@ -362,7 +369,7 @@ function set_loads_values!(time_series, load_files)
             for (timestamp_idx, timestamp) in enumerate(timestamps)
                 # Iterate over generator IDs
                 for (load_id_idx, load_id) in enumerate(load_ids)
-                    load_value = load_data[!, load_id_idx + 1][timestamp_idx]  # Extract load_value for the current gen_id
+                    load_value_pu = load_data[!, load_id_idx + 1][timestamp_idx] / baseMVA  # Extract load_value for the current load_id
 
                     # Update time_series with aggregated generation values using haskey
                     if !haskey(time_series, "load")
@@ -378,7 +385,7 @@ function set_loads_values!(time_series, load_files)
                     while length(time_series["load"][load_id]["pd"]) < timestamp
                         push!(time_series["load"][load_id]["pd"], 0)
                     end
-                    time_series["load"][load_id]["pd"][timestamp] += load_value
+                    time_series["load"][load_id]["pd"][timestamp] += load_value_pu
                 end
             end
         end

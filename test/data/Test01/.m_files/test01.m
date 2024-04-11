@@ -5,7 +5,7 @@ mpc.version = '2';
 
 %%-----  Power Flow Data  -----%%
 %% system MVA base
-mpc.baseMVA = 1;
+mpc.baseMVA = 100;
 
 mpc.time_elapsed = 1.0;
 
@@ -15,7 +15,7 @@ mpc.time_elapsed = 1.0;
 % bus_i type Pd Qd Gs Bs area Vm Va baseKV zone Vmax Vmin
 mpc.bus = [
       1    2 0 0  0  0    1 1  0     400    1  1.1  0.9;
-      2    1 15 0  0  0    1 1  0     400    1  1.1  0.9;  % Pd : dimensioning power of the load
+      2    1 10 0  0  0    1 1  0     400    1  1.1  0.9;  % Pd : dimensioning power of the load
 ];
 
 %% generator
@@ -38,12 +38,6 @@ mpc.branch = [
 ];
 
 %column_names% c_rating_a
-%mpc.branch_currents = [
-%                      15.00;
-%];
-
-%% load additional data
-%column_names% load_id pf_angle pshift_up_rel_max pshift_down_rel_max tshift_up tshift_down eshift_rel_max pred_rel_max ered_rel_max cost_shift cost_red cost_curt  cost_inv flex co2_cost lifetime
-mpc.load_extra = [
-                     1   0              0                 0         0           0            0        0         0      10.0    100.0   1e4  100000.0    0      0.0       10;
+mpc.branch_currents = [
+                      15.00;
 ];

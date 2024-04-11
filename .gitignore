@@ -32,3 +32,6 @@ output/
 # VS Code files
 .vscode/
 *.code-workspace
+
+# draft folder
+draft/
