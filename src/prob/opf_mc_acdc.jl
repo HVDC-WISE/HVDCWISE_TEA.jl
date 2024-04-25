@@ -40,6 +40,7 @@ function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true)
         # AC grid variables: storage
         if haskey(pm.data, "dim")
             _PM.variable_storage_power(pm; nw = n)
+            _FP.variable_absorbed_energy(pm; nw = n)
         end
 
         # AC/DC converter variables
