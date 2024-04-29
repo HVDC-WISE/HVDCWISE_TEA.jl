@@ -10,7 +10,10 @@ function build_outputs(case_name::String, raw_results::Dict)
         "storage" => Dict("ps" => "MW", "qs" => "MVAr", "qsc" => "MVAr", "sc" => "MW", "sd" => "MW", "se" => "MWh")
     )    
 
-    work_dir = joinpath(_HWTEA_dir, "test\\data\\$case_name")
+    work_dir = joinpath(_HWTEA_dir, "output\\data\\$case_name")
+    if !isdir(work_dir)
+        mkpath(work_dir)
+    end
     excel_path = joinpath(work_dir, "$case_name"*"_results.xlsx")
     nw = raw_results["solution"]["nw"]
     hours = sort!([h for h in keys(nw)])

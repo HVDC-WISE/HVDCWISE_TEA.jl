@@ -12,6 +12,8 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ## [add_tests] - 2024-04-29
 ### Added
 - Excel user interface for inputs & outputs
+### Changed
+- Test results saved in the untracked folder "output"
 ### Fixed
 - test01 (1 gen & 1 load)
 - test02 (1 ndgen & 1 flexible load)

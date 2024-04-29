@@ -3,7 +3,8 @@ import DataFrames
 using XLSX
 
 function build_raw_inputs(case_name::String, base_mva::Int)
-    work_dir = joinpath(_HWTEA_dir, "test\\data\\$case_name")
+    input_dir = joinpath(_HWTEA_dir, "test\\data\\$case_name")
+    output_dir = joinpath(_HWTEA_dir, "output\\data\\$case_name")
 
     ## .m file building
     
@@ -23,10 +24,10 @@ function build_raw_inputs(case_name::String, base_mva::Int)
     "storage_extra" => "storage additional data"
     )
 
-    excel_path = joinpath(work_dir, "$case_name"*"_model.xlsx")
+    excel_path = joinpath(input_dir, "$case_name"*"_model.xlsx")
     @assert isfile(excel_path) "$excel_path is not a file"
     excel_file = XLSX.readxlsx(excel_path)
-    matpower_path = joinpath(work_dir, "$case_name.m")
+    matpower_path = joinpath(output_dir, "$case_name.m")
     if isfile(matpower_path)
         rm(matpower_path; force=true)
     end
@@ -90,12 +91,12 @@ function build_raw_inputs(case_name::String, base_mva::Int)
     )
 
     for component_type in ["branch", "branchdc", "convdc", "gen", "load", "storage"]
-        comp_dir_path = joinpath(work_dir, component_type)
+        comp_dir_path = joinpath(output_dir, component_type)
         if isdir(comp_dir_path)
             rm(comp_dir_path; force=true, recursive=true)
         end
     end
-    excel_path = joinpath(work_dir, "$case_name"*"_series.xlsx")
+    excel_path = joinpath(input_dir, "$case_name"*"_series.xlsx")
     excel_file = XLSX.readxlsx(excel_path)
     sheet_names = XLSX.sheetnames(excel_file)
     for sheet_name in sheet_names
@@ -108,7 +109,7 @@ function build_raw_inputs(case_name::String, base_mva::Int)
             if n_rows > 2 && n_cols > 1  # Second row is for component id. First column (for time) is not conserved.
                 @assert sheet[2,1] == "Time\\Id" "$excel_path $sheet_name A2 should be Time\\Id"
                 if sum([string(sheet[row,col]) == "missing" for row=3:n_rows for col=2:n_cols]) == 0  # sheet not empty
-                    comp_dir_path = joinpath(work_dir, component_type)
+                    comp_dir_path = joinpath(output_dir, component_type)
                     if isdir(comp_dir_path) == false
                         mkdir(comp_dir_path)
                     end
