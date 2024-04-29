@@ -1,16 +1,19 @@
 function build_outputs(case_name::String, raw_results::Dict)
     results_structure = Dict(
-        "bus" => Dict("va" => "°?", "vm" => "pu"),  # FIXME verify the angle units and convert magnitude into kV
+        "bus" => Dict("vm" => "pu", "va" => "°?"),  # FIXME verify the angle units and convert magnitude into kV
+        "busdc" => Dict("vm" => "pu"),  # FIXME convert voltage into kV
         "branch" => Dict("pf" => "MW", "pt" => "MW", "qf" => "MVAr", "qt" => "MVAr"),
+        "branchdc" => Dict("i_from" => "pu", "i_to" => "pu"),  # FIXME convert currents into kA
+        "convdc" => Dict("ppr_fr" => "MW", "qpr_fr" => "MVAr", "pconv" => "MW", "qconv" => "MVAr", "pdc" => "MW"),  # "vmconv" => "pu", "vaconv" => "°?", "iconv" => "pu", "ptf_to" => "MW", "qtf_to" => "MVAr", "pgrid" => "MW", "pdcg" => "MW",),  # FIXME verify the angle units and convert magnitude into kV (and iconv in kA). And eventually other parameters: vmfilt, phi, iconv_dc, iconv_dcg, vafilt, qgrid, pdcg_shunt, iconv_dcg_shunt.
         "gen" => Dict("pg" => "MW", "pgcurt" => "MW", "qg" => "MVAr"),
-        "load" => Dict("ered" => "MWh", "eshift_down" => "MWh", "eshift_up" => "MWh", "pflex" => "MW", "pred" => "MW", "pshift_down" => "MW", "pshift_up" => "MW"),
+        "load" => Dict("ered" => "MWh", "eshift_down" => "MWh", "eshift_up" => "MWh", "pflex" => "MW", "pred" => "MW", "pcurt" => "MW", "pshift_down" => "MW", "pshift_up" => "MW"),
         "storage" => Dict("ps" => "MW", "qs" => "MVAr", "qsc" => "MVAr", "sc" => "MW", "sd" => "MW", "se" => "MWh")
-    )
+    )    
 
     work_dir = joinpath(_HWTEA_dir, "test\\data\\$case_name")
     excel_path = joinpath(work_dir, "$case_name"*"_results.xlsx")
     nw = raw_results["solution"]["nw"]
-    hours = [h for h in keys(nw)]
+    hours = sort!([h for h in keys(nw)])
     @assert length(hours) > 0 "The length of the raw results is 0"
     h1 = hours[1]  # h1 should be "1"
     base_mva = nw[h1]["baseMVA"]
@@ -39,7 +42,8 @@ function build_outputs(case_name::String, raw_results::Dict)
             comp_attributes = keys(nw[h1][component_type][id1])
             for attribute in comp_attributes
                 if attribute in keys(results_structure[component_type])
-                    if occursin("MW", results_structure[component_type][attribute])
+                    unit = results_structure[component_type][attribute]
+                    if occursin("MW", unit) || occursin("MVA", unit)
                         base_value = base_mva
                     else
                         base_value = 1
@@ -49,7 +53,11 @@ function build_outputs(case_name::String, raw_results::Dict)
                         comp_results[name] = Vector{Any}()
                         for h in hours
                             if component_type in keys(nw[h]) && id in keys(nw[h][component_type])
-                                push!(comp_results[name], nw[h][component_type][id][attribute] * base_value)
+                                value = nw[h][component_type][id][attribute] * base_value
+                                if value isa Array
+                                    value = join(value, "|")
+                                end
+                                push!(comp_results[name], value)
                             else
                                 push!(comp_results[name], nothing)
                             end
@@ -67,7 +75,7 @@ function build_outputs(case_name::String, raw_results::Dict)
             end
             nrows, ncols = size(comp_table)
             comp_sheet[2:3,1] = ["Time", "h"]
-            comp_sheet[4:nrows+3, 1] = [i for i in 1:nrows]
+            comp_sheet[4:nrows+3, 1] = [parse(Int, h) for h in hours]
             comp_sheet[1:3,2] = ["Id", "Attribute", "Unit"]
             for (col, name) in enumerate(names(comp_table))
                 id, attribute = split(name, "-")

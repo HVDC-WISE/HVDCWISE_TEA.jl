@@ -9,12 +9,14 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
-## [add_tests] - 2024-04-25
+## [add_tests] - 2024-04-29
 ### Added
 - Excel user interface for inputs & outputs
 ### Fixed
 - test01 (1 gen & 1 load)
-- almost test05 (1 gen & 1 load & 1 storage)
+- test02 (1 ndgen & 1 flexible load)
+- test04 (1 DC line & 2 converters)
+- test05 (1 gen & 1 load & 1 storage) implemented but not validated
 
 ## [add_tests] - 2024-04-11
 ### Changed

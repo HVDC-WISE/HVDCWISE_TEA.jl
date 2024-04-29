@@ -7,7 +7,7 @@ using Test
 include("../src/io/load_case.jl")
 
 @testset "Tests Cases" begin
-    
+    #
     @testset "Test case 01 : Single AC Line" begin
         # Load and run test case 1
         baseMVA = 100
@@ -33,38 +33,89 @@ include("../src/io/load_case.jl")
             println("Error loading test01. Check CSV and .m files name and location.")
         end
     end
-    #=
+    #
     @testset "Test case 02 : Single AC Line with flexible load and non-dispatchable generators" begin
         # Load and run test case 2
-        global results_2 = load_case("test02")
+        baseMVA = 100
+        global results_2 = load_case("test02", baseMVA, true)
 
         if results_2 !== nothing
             @test results_2["termination_status"] == _HWTEA.OPTIMAL
-            # @test results_2["objective"] ≈ 30900.0 rtol = 1e-3
-            # 8 MW of load and 11 MW of available production. 1 MW should be shifted upward.
-            # 9 MW of expected consumption & production. Neither reduction nor curtailment.
-            @test results_2["solution"]["nw"]["1"]["gen"]["1"]["pg"] ≈ 9.0 atol=1e-3
-            @test results_2["solution"]["nw"]["1"]["branch"]["1"]["pt"] ≈ -9.0 atol=1e-3
-            @test results_2["solution"]["nw"]["1"]["branch"]["1"]["pf"] ≈ 9.0 atol=1e-3
-            @test results_2["solution"]["nw"]["1"]["load"]["1"]["pflex"] ≈ 9.0 atol=1e-3
-            # TODO add tests for pred, pshift_up, pshift_down
-            @test results_2["solution"]["nw"]["1"]["load"]["1"]["pcurt"] ≈ 0.0 atol=1e-3
+            @test results_2["objective"] ≈ 411.0 rtol = 1e-3
+            # t=1
+            # 8 MW of load and 11 MW of available production. 1 MW should be shifted upward (load shift is limited to +/- 1 MW).
+            # 9 MW of expected consumption & production. Neither load reduction nor load curtailment.
+            @test results_2["solution"]["nw"]["1"]["gen"]["1"]["pg"] + results_2["solution"]["nw"]["1"]["gen"]["2"]["pg"] ≈ 9.0/baseMVA atol=1e-3
+            @test results_2["solution"]["nw"]["1"]["branch"]["1"]["pt"] ≈ -9.0/baseMVA atol=1e-3
+            @test results_2["solution"]["nw"]["1"]["branch"]["1"]["pf"] ≈ 9.0/baseMVA atol=1e-3
+            @test results_2["solution"]["nw"]["1"]["load"]["1"]["pflex"] ≈ 9.0/baseMVA atol=1e-3
+            @test results_2["solution"]["nw"]["1"]["load"]["1"]["pshift_up"] ≈ 1.0/baseMVA atol=1e-3
+            # t=3
+            # 8 MW of load and 5 MW of available production. 1 MW should be shifted downward (load shift is limited to +/- 1 MW).
+            # 2 MW should be reduced (beyond 2 MW the load would be curtailed).
+            # Expected consumption & production: 5 MW.
+            @test results_2["solution"]["nw"]["3"]["gen"]["1"]["pg"] + results_2["solution"]["nw"]["3"]["gen"]["2"]["pg"] ≈ 5.0/baseMVA atol=1e-3
+            @test results_2["solution"]["nw"]["3"]["load"]["1"]["pflex"] ≈ 5.0/baseMVA atol=1e-3
+            @test results_2["solution"]["nw"]["3"]["load"]["1"]["pshift_down"] ≈ 1.0/baseMVA atol=1e-3
+            @test results_2["solution"]["nw"]["3"]["load"]["1"]["pred"] ≈ 2.0/baseMVA atol=1e-3
+            # t=2
+            # 8 MW of load and 7 MW of available production. Shifting downward would be compensated by load curtialment in hour 2, so no load shift and 1 MW of load reduction.
+            # Expected consumption & production: 7 MW.
+            @test results_2["solution"]["nw"]["2"]["gen"]["1"]["pg"] + results_2["solution"]["nw"]["2"]["gen"]["2"]["pg"] ≈ 7.0/baseMVA atol=1e-3
+            @test results_2["solution"]["nw"]["2"]["load"]["1"]["pflex"] ≈ 7.0/baseMVA atol=1e-3
+            @test results_2["solution"]["nw"]["2"]["load"]["1"]["pred"] ≈ 1.0/baseMVA atol=1e-3
         else
             println("Error loading test02. Check CSV and .m files name and location.")
         end
     end
+    #
     @testset "Test case 04 : AC/DC Point to Point with Single AC Line" begin
         # Load and run test case 4
-        global results_4 = load_case("test04")
+        baseMVA = 100
+        global results_4 = load_case("test04", baseMVA, true)
 
         if results_4 !== nothing
+            output_series_4 = results_4["solution"]["nw"]
             @test results_4["termination_status"] == _HWTEA.OPTIMAL
+            # t=1. 8 MW of load and 10 MW of available production.
+            # Both lines are fully available: there is no load shedding.
+            @test output_series_4["1"]["gen"]["1"]["pg"] ≈ 8.0/baseMVA atol=1e-3
+            @test output_series_4["1"]["load"]["1"]["pflex"] ≈ 8.0/baseMVA atol=1e-3
+            @test output_series_4["1"]["load"]["1"]["pcurt"] ≈ 0.0/baseMVA atol=1e-3
+            # t=2. 13 MW of load and 10 MW of available production.
+            # Both lines are fully available: there is 3 MW of load shedding.
+            @test output_series_4["2"]["gen"]["1"]["pg"] ≈ 10.0/baseMVA atol=1e-3
+            @test output_series_4["2"]["load"]["1"]["pflex"] ≈ 10.0/baseMVA atol=1e-3
+            @test output_series_4["2"]["load"]["1"]["pcurt"] ≈ 3.0/baseMVA atol=1e-3
+
+            # t=3. 8 MW of load and 10 MW of available production.
+            # The AC line is unavailable so only 5 MW can be consumed by the load.
+            @test output_series_4["3"]["gen"]["1"]["pg"] ≈ 5.0/baseMVA atol=1e-3
+            @test output_series_4["3"]["load"]["1"]["pflex"] ≈ 5.0/baseMVA atol=1e-3
+            @test output_series_4["3"]["load"]["1"]["pcurt"] ≈ 3.0/baseMVA atol=1e-3
+
+            # t=4. 8 MW of load and 10 MW of available production.
+            # 1 pole of the DC line is unavailable so its power rating is halved to 2.5 MW: only 7.5 MW can be consumed by the load.
+            @test output_series_4["4"]["gen"]["1"]["pg"] ≈ 7.5/baseMVA atol=1e-3
+            @test output_series_4["4"]["load"]["1"]["pflex"] ≈ 7.5/baseMVA atol=1e-3
+            @test output_series_4["4"]["load"]["1"]["pcurt"] ≈ 0.5/baseMVA atol=1e-3
+
+            # t=5. 8 MW of load and 10 MW of available production.
+            # 1 pole of a converter is unavailable so its power rating is halved to 2.5 MW: only 7.5 MW can be consumed by the load.
+            @test output_series_4["5"]["gen"]["1"]["pg"] ≈ 7.5/baseMVA atol=1e-3
+            @test output_series_4["5"]["load"]["1"]["pflex"] ≈ 7.5/baseMVA atol=1e-3
+            @test output_series_4["5"]["load"]["1"]["pcurt"] ≈ 0.5/baseMVA atol=1e-3
+
+            # t=6. 8 MW of load and 10 MW of available production.
+            # The negative pole of the DC line & the positive pole of a converter are unavailable so the whole DC transmission is unavailable: only 5 MW can be consumed by the load.
+            @test output_series_4["6"]["gen"]["1"]["pg"] ≈ 5.0/baseMVA atol=1e-3
+            @test output_series_4["6"]["load"]["1"]["pflex"] ≈ 5.0/baseMVA atol=1e-3
+            @test output_series_4["6"]["load"]["1"]["pcurt"] ≈ 3.0/baseMVA atol=1e-3
         else
             println("Error loading test04. Check CSV and .m files name and location.")
         end
     end
-    =#
-    
+    #
     @testset "Test case 05 : 1 storage + 1 generator + 1 load" begin
         # Load and run test case 5
         baseMVA = 100
@@ -96,5 +147,5 @@ include("../src/io/load_case.jl")
             println("Error loading test05. Check CSV and .m files name and location.")
         end
     end
-
+    #
 end
