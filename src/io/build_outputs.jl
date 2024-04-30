@@ -16,7 +16,9 @@ function build_outputs(case_name::String, raw_results::Dict)
     end
     excel_path = joinpath(work_dir, "$case_name"*"_results.xlsx")
     nw = raw_results["solution"]["nw"]
-    hours = sort!([h for h in keys(nw)])
+    # Sorting of the hours (to avoid having 1 10 ... 19 2 ...)
+    hours = sort!([parse(Int, h) for h in keys(nw)])
+    hours = ["$h" for h in hours]
     @assert length(hours) > 0 "The length of the raw results is 0"
     h1 = hours[1]  # h1 should be "1"
     base_mva = nw[h1]["baseMVA"]
@@ -35,7 +37,12 @@ function build_outputs(case_name::String, raw_results::Dict)
             end
         end
     end
-
+    # Sorting of the component ids (to avoid having 1 10 ... 19 2 ...)  # FIXME sorting not correct in the Excel result file
+    for component_type in keys(full_grid)
+        comp_ids = full_grid[component_type]
+        comp_ids = sort!([parse(Int, id) for id in comp_ids])
+        full_grid[component_type] = ["$id" for id in comp_ids]
+    end
     XLSX.openxlsx(excel_path, mode="w") do xf
         for component_type in keys(full_grid)
             comp_results = Dict{String, Any}()

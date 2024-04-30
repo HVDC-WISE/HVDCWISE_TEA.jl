@@ -9,13 +9,13 @@ include("build_raw_inputs.jl")
 include("build_outputs.jl")
 
 function load_case(case_name::String, base_mva::Int=100, save_results::Bool=false)
-    work_dir = joinpath(_HWTEA_dir, "test\\data\\$case_name")
+    work_dir = joinpath(_HWTEA_dir, "output\\data\\$case_name")
 
     ## Buil .m & .csv files
     build_raw_inputs(case_name, base_mva)
 
-    ## Defin the path of the .m file
-    m_file = joinpath(_HWTEA_dir, "test\\data\\$case_name\\$case_name.m")
+    ## Define the path of the .m file
+    m_file = joinpath(work_dir, "$case_name.m")
 
     ## Read CSV files and save data in the time_series dictionary
     time_series = Dict{String, Any}()
