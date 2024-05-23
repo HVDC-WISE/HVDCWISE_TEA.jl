@@ -1,12 +1,8 @@
 export solve_mc_acdcopf
 
-function solve_mc_acdcopf(file::String, model_type::Type, solver; kwargs...)
-    data = parse_data(file)
-    return solve_mc_acdcopf(
-        data, model_type, solver;
-        ref_extensions=[_FP.ref_add_gen!, _FP.ref_add_storage!, _CBA.ref_add_pst!, _PMMCDC.add_ref_dcgrid!, ref_add_flex_load!],
-        kwargs...
-    )
+function solve_mc_acdcopf(paths::Vector{String}, model_type::Type, solver; kwargs...)
+    data = parse_data(paths...)
+    return solve_mc_acdcopf(data, model_type, solver; kwargs...)
 end
 
 function solve_mc_acdcopf(data::Dict{String,Any}, model_type::Type, solver; kwargs...)
@@ -18,6 +14,7 @@ function solve_mc_acdcopf(data::Dict{String,Any}, model_type::Type, solver; kwar
         kwargs...
     )
 end
+
 
 function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true)
 

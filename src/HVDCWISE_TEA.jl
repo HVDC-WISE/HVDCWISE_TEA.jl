@@ -3,6 +3,8 @@ module HVDCWISE_TEA
 
 ## Imports
 
+import Distributed as _DC
+
 import Memento
 import JuMP
 import InfrastructureModels as _IM
@@ -36,10 +38,14 @@ include("core/variable.jl")
 include("form/acp.jl")
 include("form/dcp.jl")
 
+include("io/export.jl")
 include("io/parse.jl")
+
+include("parallel/base.jl")
 
 include("prob/opf_mc_acdc.jl")
 
+_PM.silence()
 
 ## Exports
 
@@ -60,7 +66,6 @@ for sym in names(@__MODULE__, all=true)
          Base.isidentifier(sym_string[2:end])))
        continue
     end
-    #println("$(sym)")
     @eval export $sym
 end
 
