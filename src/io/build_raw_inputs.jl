@@ -2,9 +2,7 @@ using CSV
 import DataFrames
 using XLSX
 
-function build_raw_inputs(case_name::String, base_mva::Int)
-    input_dir = joinpath(_HWTEA_dir, "test\\data\\$case_name")
-    output_dir = joinpath(_HWTEA_dir, "output\\data\\$case_name")
+function build_raw_inputs(input_dir::String, output_dir::String, case_name::String, base_mva::Int)
     if !isdir(output_dir)
         mkpath(output_dir)
     end

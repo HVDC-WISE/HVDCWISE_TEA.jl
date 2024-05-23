@@ -7,7 +7,7 @@ using Test
 include("../src/io/load_case.jl")
 
 @testset "Tests Cases" begin
-    #=
+    #
     @testset "Test case 01 : Single AC Line" begin
         # Load and run test case 1
         baseMVA = 100
@@ -118,7 +118,7 @@ include("../src/io/load_case.jl")
             println("Error loading test04. Check CSV and .m files name and location.")
         end
     end
-    =#
+    #=
     @testset "Test case 05 : 1 storage + 1 generator + 1 load" begin
         # Load and run test case 5
         baseMVA = 100
@@ -149,6 +149,33 @@ include("../src/io/load_case.jl")
             @test output_series_5["1"]["storage"]["1"]["sd"] ≈ 1/baseMVA atol=1e-3  # ps=sc-sd
         else
             println("Error loading test05. Check CSV and .m files name and location.")
+        end
+    end
+    =#
+    @testset "Test case 05b : 1 storage + 1 generator + 1 load" begin
+        # Load and run test case 5
+        baseMVA = 100
+        global results_5 = load_case("test05b", baseMVA, true)
+
+        if results_5 !== nothing
+            @test results_5["termination_status"] == _HWTEA.OPTIMAL
+            @test results_5["objective"] ≈ 4500 rtol = 1e-2  # 4508 instead of 4500 due to losses
+            output_series_5 = results_5["solution"]["nw"]
+            for t in ["1", "2"]
+            # t = 1 & 2: Demand=9 and Available=10 -> 1 MW consumed by the storage & 9 MW by the load (no load shedding)
+                @test output_series_5[t]["gen"]["1"]["pg"] ≈ 10/baseMVA atol=1e-3
+                @test output_series_5[t]["load"]["1"]["pcurt"] ≈ 0/baseMVA atol=1e-3
+                @test output_series_5[t]["storage"]["1"]["ps"] ≈ 1/baseMVA atol=1e-3  # ps=sc-sd (storage power = chargin power - discharging power)
+                # @test output_series_5[t]["storage"]["1"]["sc"] ≈ 1/baseMVA atol=1e-3  # ps=sc-sd
+            end
+
+            # t=3: Demand=13 and Available=10 -> 2 MW produced by the storage (because its production power is limited to 2 MW) & 1 MW of load shedding
+            @test output_series_5["3"]["gen"]["1"]["pg"] ≈ 10/baseMVA atol=1e-3
+            @test output_series_5["3"]["load"]["1"]["pcurt"] ≈ 1/baseMVA atol=1e-3
+            @test output_series_5["3"]["storage"]["1"]["ps"] ≈ -2/baseMVA atol=1e-3
+            # @test output_series_5["1"]["storage"]["1"]["sd"] ≈ 2/baseMVA atol=1e-3  # ps=sc-sd
+        else
+            println("Error loading test05b. Check CSV and .m files name and location.")
         end
     end
     #=

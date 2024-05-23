@@ -9,6 +9,12 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2024-05-23
+### Added
+- test05 (1 gen & 1 load & 1 storage) implemented & validated
+- run_study.jl
+- Raw results saving in JSON
+
 ## [add_tests] - 2024-04-30
 ### Added
 - Excel user interface for inputs & outputs

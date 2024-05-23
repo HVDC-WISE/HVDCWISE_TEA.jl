@@ -36,3 +36,6 @@ output/
 # draft folder
 draft/
 test/data/test_size
+
+# folder for studies
+studies/

@@ -1,4 +1,13 @@
-function build_outputs(case_name::String, raw_results::Dict)
+import JSON
+
+function build_outputs(work_dir::String, case_name::String, raw_results::Dict)
+    json_path = joinpath(work_dir, "$case_name"*"_results.json")
+    stringdata = JSON.json(raw_results, 4)
+
+    open(json_path, "w") do f
+        write(f, stringdata)
+    end
+
     results_structure = Dict(
         "bus" => Dict("vm" => "pu", "va" => "°?"),  # FIXME verify the angle units and convert magnitude into kV
         "busdc" => Dict("vm" => "pu"),  # FIXME convert voltage into kV
@@ -10,7 +19,6 @@ function build_outputs(case_name::String, raw_results::Dict)
         "storage" => Dict("ps" => "MW", "qs" => "MVAr", "qsc" => "MVAr", "sc" => "MW", "sd" => "MW", "se" => "MWh")
     )    
 
-    work_dir = joinpath(_HWTEA_dir, "output\\data\\$case_name")
     if !isdir(work_dir)
         mkpath(work_dir)
     end
