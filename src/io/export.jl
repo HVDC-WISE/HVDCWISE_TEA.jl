@@ -1,10 +1,14 @@
 
-function init_database(path::String, model_type::Type, solver; kwargs...)
+function init_database(paths::Vector{String}, model_type::Type, solver; kwargs...)
 
     names = ["qg", "qf", "qt", "qpr_fr", "qtf_to", "qconv", "qgrid", "iconv", "pdcg_shunt", "phi", "vmfilt", "vmconv", "vm"]
 
-    grid = parse_data(path)
+    # Solve exemplary model
+    grid = parse_data(paths..., 10)
     results = solve_mc_acdcopf(grid, model_type, solver; kwargs...)["solution"]
+    # Keep only results for one timestep
+    grid = grid["nw"]["1"]
+    results = results["nw"]["1"]
     filter!(x -> isa(x.second, Dict) & !isempty(x.second), results)
 
     db = Dict{String,Any}()
