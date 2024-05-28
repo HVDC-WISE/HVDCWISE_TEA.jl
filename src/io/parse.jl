@@ -43,6 +43,31 @@ function parse_data(path2grid::String, path2data::String; kwargs...)
     return mn_data
 end
 
+function parse_data(path2grid::String, path2data::String, num::Int; kwargs...)
+
+    # Parse initial single-network structure
+    sn_data = parse_file(path2grid; kwargs...)
+    # Parse time series data
+    time_series, hours = parse_timeseries(path2data, sn_data)
+    # Keep only first `num` steps of the time series
+    hours = hours > num ? num : hours
+    for comp in values(time_series)
+        for var in values(comp)
+            for array in values(var)
+                keepat!(array, 1:hours)
+            end
+        end
+    end
+    # Add hour dimension to single-network data
+    _FP.add_dimension!(sn_data, :hour, hours)
+    # Create the multinetwork data dictionary
+    mn_data = _FP.make_multinetwork(sn_data, time_series; share_data=false)
+    # Convert the DC grid (if any) of each single-network model to multi-conductor
+    _PMMCDC.make_multiconductor!(mn_data)
+
+    return mn_data
+end
+
 function parse_data(path2grid::String; kwargs...)
 
     # Parse initial single-network structure
