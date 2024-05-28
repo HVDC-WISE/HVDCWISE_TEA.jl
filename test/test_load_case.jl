@@ -1,10 +1,12 @@
+using Distributed
+using HVDCWISE_TEA
 import HVDCWISE_TEA as _HWTEA
-
-const _HWTEA_dir = dirname(dirname(pathof(_HWTEA))) # Root directory of HVDCWISE_TEA package
-const save_results = true  # To save test results in Excel files
+import PowerModels as _PM
 
 using Test
-include("../src/io/load_case.jl")
+
+const save_results = true  # To save test results in Excel files
+
 
 @testset "Tests Cases" begin
     #
