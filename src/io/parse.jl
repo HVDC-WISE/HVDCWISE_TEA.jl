@@ -27,7 +27,7 @@ Wrapper function for parsing, sequentially:
  - The single or multi-network structure into a multi-conductor one (for the HVDC grid part, if provided).
 
 """
-function parse_data(path2grid::String, path2data::String; kwargs...)
+function parse_data(path2grid::String, path2data::Vector{String}; kwargs...)
 
     # Parse initial single-network structure
     sn_data = parse_file(path2grid; kwargs...)
@@ -43,7 +43,7 @@ function parse_data(path2grid::String, path2data::String; kwargs...)
     return mn_data
 end
 
-function parse_data(path2grid::String, path2data::String, num::Int; kwargs...)
+function parse_data(path2grid::String, path2data::Vector{String}, num::Int; kwargs...)
 
     # Parse initial single-network structure
     sn_data = parse_file(path2grid; kwargs...)
@@ -78,59 +78,64 @@ function parse_data(path2grid::String; kwargs...)
     return sn_data
 end
 
-function parse_timeseries(path::String, network::Dict{String, <:Any})
+function parse_timeseries(paths::Vector{String}, network::Dict{String, <:Any})
 
     dim = Int[]
     data = Dict{String, Any}()
-    for component in readdir(path)
-        # Initialise nested dictionary for given component
-        data[component] = Dict(key => Dict{String, Any}() for key in keys(network[component]))
 
-        for file in readdir(joinpath(path, component))
+    for path in paths
+        for component in readdir(path)
 
-            var = string(first(split(file, ".")))
-            # Check if the variable name exists for the given component
-            if !in(var, keys(first(values(network[component]))))
-                msg = "Variable name $var does not exists for power system component $component."
-                error(msg)
-            end
-            # Initialise empty vector of the correct type
-            type = typeof(first(values(network[component]))[var])
-            for value in values(data[component])
-                value[var] = Vector{type}()
+            if !haskey(data, component)
+                # Initialise nested dictionary for given component
+                data[component] = Dict(key => Dict{String, Any}() for key in keys(network[component]))
             end
 
-            # Read timeseries data for the given component variable
-            df = CSV.read(joinpath(path, component, file), _DF.DataFrame, header=true)
-            # Check for NaN in timeseries data
-            if any(isnan.(Matrix(df)))
-                msg = "NaN values exist in timeseries for variable $var of component $component."
-                error(msg)
-            end
-            # Check if timeseries length is consistent across different files
-            append!(dim, size(df, 1))
-            if length(unique(dim)) > 1
-                msg = "Length of timeseries is inconsistent across different input files."
-                error(msg)
-            end
-            df = Dict(names(df) .=> eachcol(df))
+            for file in readdir(joinpath(path, component))
 
-            # Assign value to dictionary
-            for (key, value) in data[component]
-                if in(key, keys(df))
-                    timeseries = convert(Vector{type}, pop!(df, key))
-                else
-                    timeseries = repeat([network[component][key][var]], dim[end])
+                var = string(first(split(file, ".")))
+                # Check if the variable name exists for the given component
+                if !in(var, keys(first(values(network[component]))))
+                    msg = "Variable name $var does not exists for power system component $component."
+                    error(msg)
                 end
-                append!(value[var], timeseries)
-            end
-            # Check if there are keys that do not exist for the given component
-            if !isempty(df)
-                msg = "Timeseries data for variable $var of component $component is defined for elements that do not exist."
-                error(msg)
+                # Initialise empty vector of the correct type
+                type = typeof(first(values(network[component]))[var])
+                for value in values(data[component])
+                    value[var] = Vector{type}()
+                end
+
+                # Read timeseries data for the given component variable
+                df = CSV.read(joinpath(path, component, file), _DF.DataFrame, header=true)
+                # Check for NaN in timeseries data
+                if any(isnan.(Matrix(df)))
+                    msg = "NaN values exist in timeseries for variable $var of component $component."
+                    error(msg)
+                end
+                # Check if timeseries length is consistent across different files
+                append!(dim, size(df, 1))
+                if length(unique(dim)) > 1
+                    msg = "Length of timeseries for variable $var of component $component is inconsistent with other timeseries."
+                    error(msg)
+                end
+                df = Dict(names(df) .=> eachcol(df))
+
+                # Assign value to dictionary
+                for (key, value) in data[component]
+                    if in(key, keys(df))
+                        timeseries = convert(Vector{type}, pop!(df, key))
+                    else
+                        timeseries = repeat([network[component][key][var]], dim[end])
+                    end
+                    append!(value[var], timeseries)
+                end
+                # Check if there are keys that do not exist for the given component
+                if !isempty(df)
+                    msg = "Timeseries data for variable $var of component $component is defined for elements that do not exist."
+                    error(msg)
+                end
             end
         end
     end
-
     return data, dim[begin]
 end

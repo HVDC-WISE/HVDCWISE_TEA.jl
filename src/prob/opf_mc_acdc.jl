@@ -1,6 +1,6 @@
 export solve_mc_acdcopf
 
-function solve_mc_acdcopf(paths::Vector{String}, model_type::Type, solver; kwargs...)
+function solve_mc_acdcopf(paths::Vector{Any}, model_type::Type, solver; kwargs...)
     data = parse_data(paths...)
     return solve_mc_acdcopf(data, model_type, solver; kwargs...)
 end
