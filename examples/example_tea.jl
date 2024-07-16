@@ -14,7 +14,7 @@ addprocs(Sys.CPU_THREADS ÷ 2; exeflags = "--project=$(Base.active_project())")
 
 ## Path and solver parameters
 
-path2grid = joinpath(_HWTEA_dir, "test/data/grids/acdc/case5_3grids_MC.m")
+path2grid = joinpath(_HWTEA_dir, "test/data/grids/acdc/case39_mcdc.m")
 path2data = joinpath(_HWTEA_dir, "test/data/timeseries/example_mc")
 # path2grid = joinpath(_HWTEA_dir, "studies/39bus/case39_mcdc.m")
 # path2data = joinpath(_HWTEA_dir, "studies/39bus/1_week_without_storage")

@@ -1,5 +1,5 @@
 
-function init_database(paths::Vector{String}, model_type::Type, solver; kwargs...)
+function init_database(paths::Vector{Any}, model_type::Type, solver; kwargs...)
 
     names = ["qg", "qf", "qt", "qpr_fr", "qtf_to", "qconv", "qgrid", "iconv", "pdcg_shunt", "phi", "vmfilt", "vmconv", "vm"]
 

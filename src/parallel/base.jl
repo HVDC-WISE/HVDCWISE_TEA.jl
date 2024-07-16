@@ -2,8 +2,15 @@ export run_tea
 
 function run_tea(path2grid::String, path2data::String, model_type::Type, solver; kwargs...)
 
+    # Get the path to micro-scenario data
+    pathlist = Vector{String}[]
+    for folder in readdir(path2data)
+        path = joinpath(path2data, folder)
+        push!(pathlist, joinpath.(path, readdir(path)))
+    end
+    path2scenario = vec(collect(Base.product(pathlist...)))
     # Generate list of scenarios to be analysed
-    paths = [[path2grid, joinpath(path2data, h)] for h in readdir(path2data)]
+    paths = [[path2grid, collect(h)] for h in path2scenario]
     # Make directory where to save results
     mkdir(joinpath(path2data, "results"))
     # Instantiate results database
@@ -14,10 +21,13 @@ function run_tea(path2grid::String, path2data::String, model_type::Type, solver;
 end
 
 
-function run_opf(paths::Vector{String}, database, model_type::Type, solver; kwargs...)
+function run_opf(paths::Vector{Any}, database, model_type::Type, solver; kwargs...)
 
-    # Create scenario folder
-    path2out = mkdir(joinpath(dirname(last(paths)), "results", basename(last(paths))))
+    # Derive micro-scenario name and create results folder
+    scenario = [join([basename(dirname(h)), basename(h)], "-") for h in last(paths)]
+    scenario = join(scenario, "_")
+    pathbase = dirname(dirname(first(last(paths))))
+    path2out = mkdir(joinpath(pathbase, "results", scenario))
     # Run hybrid AC/DC OPF
     results = solve_mc_acdcopf(paths, model_type, solver; kwargs...)
     # Record OPF results and save them to CSV file
