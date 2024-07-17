@@ -2,7 +2,9 @@ import PowerModels as _PM
 import HVDCWISE_TEA as _HWTEA
 import Ipopt
 
-const _HWTEA_dir = dirname(dirname(pathof(_HWTEA))) # Root directory of HVDCWISE_TEA package
+HVDCWISE_TEA.silence()
+
+const _HWTEA_dir = dirname(dirname(pathof(_HWTEA)));
 
 ## Path and solver parameters
 

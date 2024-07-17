@@ -3,12 +3,17 @@ using HVDCWISE_TEA
 import PowerModels as _PM
 import Ipopt
 
-const _HWTEA_dir = dirname(dirname(pathof(HVDCWISE_TEA))) # Root directory of HVDCWISE_TEA package
+const _HWTEA_dir = dirname(dirname(pathof(HVDCWISE_TEA)));
 
 ## Workers setup
 
 nprocs() > 1 && rmprocs(workers())
 addprocs(Sys.CPU_THREADS ÷ 2; exeflags = "--project=$(Base.active_project())")
+@everywhere begin
+    using HVDCWISE_TEA
+    using Ipopt
+    HVDCWISE_TEA.silence()
+end
 
 ## Path and solver parameters
 

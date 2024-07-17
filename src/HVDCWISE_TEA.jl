@@ -26,6 +26,14 @@ const _LOGGER = Memento.getlogger(@__MODULE__)
 # NOTE: If this line is not included then the precompiled `HVDCWISE_TEA._LOGGER` won't be registered at runtime.
 __init__() = Memento.register(_LOGGER)
 
+function silence()
+    Memento.info(_LOGGER, "Suppressing information and warning messages for the rest of this session. Use the Memento package for more fine-grained control of logging.")
+    Memento.setlevel!(Memento.getlogger(_IM), "error")
+    Memento.setlevel!(Memento.getlogger(_PM), "error")
+    Memento.setlevel!(Memento.getlogger(_PMMCDC), "error")
+    Memento.setlevel!(Memento.getlogger(_FP), "error")
+end
+
 
 ## Includes
 
@@ -46,8 +54,6 @@ include("io/scenario.jl")
 include("parallel/base.jl")
 
 include("prob/opf_mc_acdc.jl")
-
-_PM.silence()
 
 ## Exports
 
