@@ -39,7 +39,9 @@ include("form/acp.jl")
 include("form/dcp.jl")
 
 include("io/export.jl")
+include("io/multinetwork.jl")
 include("io/parse.jl")
+include("io/scenario.jl")
 
 include("parallel/base.jl")
 

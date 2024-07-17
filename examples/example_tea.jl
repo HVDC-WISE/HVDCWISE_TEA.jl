@@ -9,16 +9,15 @@ const _HWTEA_dir = dirname(dirname(pathof(HVDCWISE_TEA))) # Root directory of HV
 
 nprocs() > 1 && rmprocs(workers())
 addprocs(Sys.CPU_THREADS ÷ 2; exeflags = "--project=$(Base.active_project())")
-@everywhere using HVDCWISE_TEA
-@everywhere using Ipopt
 
 ## Path and solver parameters
 
+hours = 96
 path2grid = joinpath(_HWTEA_dir, "test/data/grids/acdc/case39_mcdc.m")
 path2data = joinpath(_HWTEA_dir, "test/data/timeseries/example_mc")
-optimizer = HVDCWISE_TEA.optimizer_with_attributes(Ipopt.Optimizer)
+optimizer = HVDCWISE_TEA.optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0)
 setting = Dict("output" => Dict("branch_flows" => true, "duals" =>false), "conv_losses_mp" => false);
 
 ## Solve the multiperiod OPF problem
 
-run_tea(path2grid, path2data, _PM.DCPPowerModel, optimizer; setting = setting)
+run_tea(path2grid, path2data, hours, _PM.DCPPowerModel, optimizer; setting = setting)
