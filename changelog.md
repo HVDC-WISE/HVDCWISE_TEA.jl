@@ -12,6 +12,8 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ## [add_tests] - 2024-07-22
 ### Added
 - build_simulation_inputs.jl
+### Changed
+- run_study.jl uses now the simulation inputs built by build_simulation_inputs() and splits the yearly problem in short subproblems (ex: 1 week)
 
 ## [add_tests] - 2024-05-28
 ### Added

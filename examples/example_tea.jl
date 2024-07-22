@@ -32,5 +32,5 @@ run_tea(path2grid, path2data, hours, _PM.DCPPowerModel, optimizer; setting = set
 
 # Gather results in an Excel file
 
-macro_results_dir = joinpath(path2data, "results")
-build_outputs_from_csv(macro_results_dir, 100, true)  # base_mva=100 in the .m file
+# macro_results_dir = joinpath(path2data, "results")
+# build_outputs_from_csv(macro_results_dir, 100, true)  # base_mva=100 in the .m file

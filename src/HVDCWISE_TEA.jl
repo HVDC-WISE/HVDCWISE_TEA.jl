@@ -48,6 +48,7 @@ include("form/dcp.jl")
 
 include("io/build_outputs.jl")
 include("io/build_raw_inputs.jl")
+include("io/build_simulation_inputs.jl")
 include("io/load_case.jl")
 include("io/export.jl")
 include("io/multinetwork.jl")

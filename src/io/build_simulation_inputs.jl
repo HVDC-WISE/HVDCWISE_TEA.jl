@@ -171,7 +171,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
         end
     end
 
-    # Build a dictionary containing all the required attributes in their required units (be careful about when unit conversions are needed)
+    # Build a dictionary containing all the required attributes for the matpower (.m) file, in their required units (be careful about when unit conversions are needed)
 
     matpower_data = Dict("bus" => Dict(), "busdc" => Dict(), "branch" => Dict(), "branch_currents" => Dict(), "branchdc" => Dict(), 
                          "convdc" => Dict(), "gen" => Dict(), "gencost" => Dict(), "ndgen" => Dict(), 
@@ -407,10 +407,9 @@ function build_grid_model(work_dir::String, base_mva::Int)
             end
         end
     end
-    
-    # Create a dictionary structured as template for a matpower file
-    
-    # Register the data in a .m file
+        
+    # Builds the matpower (.m) file
+
     simulation_dir = joinpath(work_dir, "simulation_interface")
     mkpath(simulation_dir)  # Create the folder (and its parents) if it does not exist yet
     matpower_path = joinpath(simulation_dir, "$macro_scenario.m")
@@ -507,7 +506,7 @@ function build_power_series(work_dir::String, base_mva::Int, model_data::Dict)
     end
     @assert length(micro_scenarios) > 0  "The files containing the power time series should end with '_series.xlsx'. No such file has been found in $user_inputs_dir."
     for micro_scenario in micro_scenarios
-        micro_scenario_dir = joinpath(work_dir, "simulation_interface", "Power", micro_scenario)
+        micro_scenario_dir = joinpath(work_dir, "simulation_interface", "Input_series", "Power", micro_scenario)
         series_path = joinpath(user_inputs_dir, "$micro_scenario"*"_series.xlsx")
         @assert isfile(series_path)  "$series_path is not a file"
         series_file = XLSX.readxlsx(series_path)
@@ -516,7 +515,7 @@ function build_power_series(work_dir::String, base_mva::Int, model_data::Dict)
         @assert "ReadMe" in sheet_names  "file $series_path should have a sheet 'ReadMe'"
         readme_sheet = series_file["ReadMe"]
         @assert [readme_sheet[7,j] for j in 1:4] == ["Attribute", "Nb of components", "Nb of hours", "Unit"]  "ReadMe sheet A7:D7 should be [Attribute, Nb of components, Nb of hours, Unit] while it is $(readme_sheet[7,1:4])"
-        @assert [readme_sheet[i,1] for i in 8:11] == ["load|pd", "gen|Pmax", "storage|inflow", "storage|outflow"]  "ReadMe sheet A8:A11 should be [load|pd, gen|Pmax, storage|inflow, storage|outflow] while it is $(readme_sheet[8:11,1])"
+        @assert [readme_sheet[i,1] for i in 8:11] == ["load|pd", "gen|pmax", "storage|inflow", "storage|outflow"]  "ReadMe sheet A8:A11 should be [load|pd, gen|pmax, storage|inflow, storage|outflow] while it is $(readme_sheet[8:11,1])"
         
         # Build 1 csv per component attribute with time series
         @assert all([readme_sheet[i,2] > 0 for i in 8:9])  "Some time series should be provided both for load|pd and gen|Pmax in micro-scenario $micro_scenario. Check sheet ReadMe in $series_path."
@@ -535,8 +534,7 @@ function build_availability_series(work_dir::String)
 end
 
 
-# FIXME delete the code below (used as test)
-
-println("beginning")
+# The code below enables to test the simulation inputs building
+println("Builds simulation inputs")
 build_simulation_inputs(joinpath(pwd(), "studies\\simple_use_case"), 100)
-println("finished")
+println("Simulation inputs building finished")
