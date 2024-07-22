@@ -134,11 +134,6 @@ function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true)
                     _FP.constraint_maximum_absorption(pm, i, nw = n)
                 end
 
-                for i in _PM.ids(pm, :flex_load, nw = n)
-                    _FP.constraint_red_state(pm, i, nw = n)
-                    _FP.constraint_shift_up_state(pm, i, nw = n)
-                    _FP.constraint_shift_down_state(pm, i, nw = n)
-                end
             else
                 if _FP.is_last_id(pm, n, :hour)
                     for i in _PM.ids(pm, :storage, nw = n)
@@ -146,26 +141,18 @@ function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true)
                     end
 
                     for i in _PM.ids(pm, :flex_load, nw = n)
-                        _FP.constraint_shift_state_final(pm, i, nw = n)
+                        _FP.constraint_shift_balance_periodic(pm, i, get(pm.setting, "demand_shifting_balance_period", 24), nw = n)
                     end
                 end
 
                 # From second hour to last hour
                 prev_n = _FP.prev_id(pm, n, :hour)
-                first_n = _FP.first_id(pm, n, :hour)
                 for i in _PM.ids(pm, :storage, nw = n)
                     _FP.constraint_storage_state(pm, i, prev_n, n)
                 end
 
                 for i in _PM.ids(pm, :storage_bounded_absorption, nw = n)
                     _FP.constraint_maximum_absorption(pm, i, prev_n, n)
-                end
-
-                for i in _PM.ids(pm, :flex_load, nw = n)
-                    _FP.constraint_red_state(pm, i, prev_n, n)
-                    _FP.constraint_shift_up_state(pm, i, prev_n, n)
-                    _FP.constraint_shift_down_state(pm, i, prev_n, n)
-                    _FP.constraint_shift_duration(pm, i, first_n, n)
                 end
             end
         end

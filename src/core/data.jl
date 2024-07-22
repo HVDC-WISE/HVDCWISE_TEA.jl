@@ -106,14 +106,32 @@ function _add_pst_data!(data::Dict{String, Any})
 end
 
 
-function find_value(data::Dict{String, <:Any})
+## Optimisation helper functions
 
-    for (_, value) in data
-        if isa(value, Dict)
-            return find_value(value)
-        else
-            return value
-            break
+
+function get_storage_energy_final(solution::Dict{String, Any})
+
+    nw = maximum(x -> parse(Int, x), keys(solution["nw"]))
+    data = Dict{String, Any}()
+    for (key, value) in get(solution["nw"][string(nw)], "storage", Dict())
+        data[key] = Dict{String, Any}("energy" => value["se"])
+    end
+    return data
+end
+
+
+function set_storage_energy_initial!(network::Dict{String, Any}, energy::Dict{String, Any})
+
+    nw = minimum(x -> parse(Int, x), keys(network["nw"]))
+    if nw > 1
+        for (key, value) in network["nw"][string(nw)]["storage"]
+            merge!(value, energy[key])
         end
     end
+    return nothing
+end
+
+
+function is_feasible(solution::Dict{String, Any})
+    return in(string(solution["termination_status"]), ["LOCALLY_SOLVED", "OPTIMAL"])
 end

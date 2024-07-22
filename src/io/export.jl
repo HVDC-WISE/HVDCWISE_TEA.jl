@@ -1,10 +1,10 @@
 
 function init_database(paths::Vector{Any}, model_type::Type, solver; kwargs...)
 
-    names = ["qg", "qf", "qt", "qpr_fr", "qtf_to", "qconv", "qgrid", "iconv", "pdcg_shunt", "phi", "vmfilt", "vmconv", "vm"]
+    names = ["qg", "qs", "qsc", "qf", "qt", "qpr_fr", "qtf_to", "qconv", "qgrid", "iconv", "pdcg_shunt", "phi", "vmfilt", "vmconv", "vm"]
 
     # Solve exemplary model
-    grid = parse_data(paths..., 10)
+    grid = parse_data(paths..., 24)
     results = solve_mc_acdcopf(grid, model_type, solver; kwargs...)["solution"]
     # Keep only results for one timestep
     grid = grid["nw"]["1"]
@@ -56,7 +56,7 @@ function export_results(solution::Dict{String, Any}, database, path::String)
     nws = string.(sort!(parse.(Int, collect(keys(solution["nw"])))))
 
     for (comp, vars) in database
-        path2comp = mkdir(joinpath(path, comp))
+        path2comp = mkpath(joinpath(path, comp))
         for var in keys(vars)
             path2var = joinpath(path2comp, var * ".csv")
             ls = Vector{Float64}[]
@@ -78,7 +78,11 @@ function export_results(solution::Dict{String, Any}, database, path::String)
             end
             res = Float32.(permutedims(reduce(hcat, ls)))
             # Save file with name of variable
-            CSV.write(path2var, _DF.DataFrame(collect(eachcol(res)), names))
+            if !isfile(path2var)
+                CSV.write(path2var, _DF.DataFrame(collect(eachcol(res)), names))
+            else
+                CSV.write(path2var, _DF.DataFrame(collect(eachcol(res)), names); append=true)
+            end
         end
     end
 end
