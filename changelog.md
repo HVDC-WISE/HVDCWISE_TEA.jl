@@ -9,6 +9,10 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2024-07-23
+### Added
+- contingencies_generation (for N-1 only)
+
 ## [add_tests] - 2024-07-22
 ### Added
 - build_simulation_inputs.jl
