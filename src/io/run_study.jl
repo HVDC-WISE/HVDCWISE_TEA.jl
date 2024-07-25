@@ -1,3 +1,10 @@
+# Manual steps to run a simulation
+# - Julia run build_grid_model() & build_power_series()
+# - copy matpower file into contingency_generation/
+# - Matlab run contingency_generation/FinalScriptHvdcWise.m
+# - Julia run build_availability_series()
+# - Julia run run_simulation()
+
 using Distributed
 using HVDCWISE_TEA
 import PowerModels as _PM
@@ -41,11 +48,18 @@ end
 
 # @time run_study(joinpath(_HWTEA_dir, "studies\\IEEE39\\3_hours_without_storage"), "IEEE39")
 
-function run_study(work_dir::String, hours::Int, base_mva::Int=100)
+function run_study(work_dir::String, hours::Int, n_availability_series::Int, base_mva::Int=100)
     println("Build simulation inputs")
-    build_simulation_inputs(work_dir, base_mva)
+    build_simulation_inputs(work_dir, n_availability_series, base_mva)
 
     println("Run simulation")
+    run_simulation(work_dir, hours, base_mva)
+
+    println("Simulation finished")
+    # TODO add post-processing here
+end
+
+function run_simulation(work_dir::String, hours::Int, base_mva::Int=100)
     #Paths
     simulation_dir = joinpath(work_dir, "simulation_interface")
     path2grid = find_grid_path(simulation_dir)
@@ -57,9 +71,6 @@ function run_study(work_dir::String, hours::Int, base_mva::Int=100)
     
     ## Solve the multiperiod OPF problem
     run_tea(path2grid, path2data, hours, _PM.DCPPowerModel, optimizer; setting = setting)
-
-    println("Simulation finished")
-    # TODO add post-processing here
 end
 
 function find_grid_path(simulation_dir::String)
@@ -78,7 +89,10 @@ function find_grid_path(simulation_dir::String)
     return joinpath(simulation_dir, matpower_name)
 end
 
+#
+# Code to test the functions in this script:
 work_dir = joinpath(_HWTEA_dir, "studies\\simple_use_case")
-hours_per_subsimulation = 96  # The yearly problem is split into subproblems of this size (1 week if 168h)
-
-run_study(work_dir, hours_per_subsimulation)
+hours_per_subsimulation = 96  # The yearly problem is split into subproblems of this size (1 week is 168h)
+n_availability_series = 3
+@time run_study(work_dir, hours_per_subsimulation, n_availability_series)
+#

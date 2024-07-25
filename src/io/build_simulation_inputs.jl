@@ -3,10 +3,17 @@ using CSV
 import DataFrames
 using XLSX
 
-function build_simulation_inputs(work_dir::String, base_mva::Int=100)
+function build_simulation_inputs(work_dir::String, n_availability_series::Int, base_mva::Int=100)
     model_data = build_grid_model(work_dir, base_mva)
-    build_power_series(work_dir, base_mva, model_data)
-    build_availability_series(work_dir)
+    power_series_info = build_power_series(work_dir, base_mva, model_data)
+    n_power_series = power_series_info["n_series"]  # Not used
+    n_hours = power_series_info["n_hours"]
+
+    matlab_tool_path = joinpath(pwd(), "src", "contingencies_generation")
+    println("Run FinalScript_HvdcWise.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
+    a = readline()  # TODO automatically run src/contingencies_generator/FinalScript_HvdcWise.m
+    println("Building availability series")
+    build_availability_series(work_dir, n_hours, n_availability_series)
 end
 
 function base_to_pu(value::Float64, unit::String, base_mva::Int, base_kv::Int)
@@ -57,8 +64,8 @@ function build_grid_model(work_dir::String, base_mva::Int)
     model_path = joinpath(user_inputs_dir, "$macro_scenario"*"_model.xlsx")
     @assert isfile(model_path)  "$model_path is not a file"
 
-    costs_path = joinpath(user_inputs_dir, "grid_costs.xlsx")
-    @assert isfile(costs_path)  "The file containing the cost data should be 'grid_costs.xlsx'. This file has not been found in $user_inputs_dir."
+    costs_path = joinpath(user_inputs_dir, "costs_data.xlsx")
+    @assert isfile(costs_path)  "The file containing the cost data should be 'costs_data.xlsx'. This file has not been found in $user_inputs_dir."
     
     default_path = joinpath(user_inputs_dir, "default_values.xlsx")
     @assert isfile(default_path)  "The file containing the default values should be 'default_values.xlsx'. This file has not been found in $user_inputs_dir."
@@ -435,6 +442,11 @@ function build_grid_model(work_dir::String, base_mva::Int)
         end
         write(f, "end\n")
     end
+    matlab_tool_path = joinpath(pwd(), "src", "contingencies_generation")
+    if isdir(joinpath(matlab_tool_path, "availability_series"))
+        rm(joinpath(matlab_tool_path, "availability_series"), recursive=true)
+    end
+    cp(matpower_path, joinpath(matlab_tool_path, "grid_model.m"), force=true)
     return model_data
 end
 
@@ -489,6 +501,7 @@ function build_csv(micro_scenario_dir::String, sheet::XLSX.Worksheet, readme_dat
         series_data[!,"$id"] = [sheet[i,id+1]*unit_conversion for i in 2:n_hours+1]
     end
     CSV.write(csv_path, series_data, writeheader=true)
+    return Dict("micro-scenario" => micro_scenario, "comp_name" => comp_name, "attribute" => attribute, "n_comp" => n_comp, "n_hours" => n_hours)
 end
 
 function build_power_series(work_dir::String, base_mva::Int, model_data::Dict)
@@ -505,6 +518,8 @@ function build_power_series(work_dir::String, base_mva::Int, model_data::Dict)
         end
     end
     @assert length(micro_scenarios) > 0  "The files containing the power time series should end with '_series.xlsx'. No such file has been found in $user_inputs_dir."
+    n_hours = 0
+    error_message_info = ""
     for micro_scenario in micro_scenarios
         micro_scenario_dir = joinpath(work_dir, "simulation_interface", "Input_series", "Power", micro_scenario)
         series_path = joinpath(user_inputs_dir, "$micro_scenario"*"_series.xlsx")
@@ -523,18 +538,52 @@ function build_power_series(work_dir::String, base_mva::Int, model_data::Dict)
             if readme_sheet[i,2] > 0
                 sheet_name = readme_sheet[i,1]
                 sheet = series_file[sheet_name]
-                build_csv(micro_scenario_dir, sheet, Dict(readme_sheet[7,j] => readme_sheet[i,j] for j in 2:4), model_data, base_mva)
+                csv_info = build_csv(micro_scenario_dir, sheet, Dict(readme_sheet[7,j] => readme_sheet[i,j] for j in 2:4), model_data, base_mva)
+                csv_hours = csv_info["n_hours"]
+                if n_hours == 0
+                    n_hours = csv_hours
+                    error_message_info = csv_info
+                else
+                    @assert n_hours == csv_hours  "Incoherent number of hours in csv files\n$csv_info\n$error_message_info"
+                end
             end
         end
     end
+    return Dict("n_series" => length(micro_scenarios), "n_hours" => n_hours)
 end
 
-function build_availability_series(work_dir::String)
-    # FIXME the Matlab script must be manually run in the current code version
+function build_availability_series(work_dir::String, n_hours::Int, n_series::Int)
+    matlab_tool_path = joinpath(pwd(), "src", "contingencies_generation")
+
+    availability_series_dir = joinpath(matlab_tool_path, "availability_series")
+    micro_scenarios = readdir(availability_series_dir)
+    @assert length(micro_scenarios) >= n_series  "$(length(micro_scenarios)) availability series are available in $availability_series_dir. You cannot have $n_series series."
+    for i in 1:n_series
+        microscenario = micro_scenarios[i]
+        micro_dir = joinpath(availability_series_dir, microscenario)
+        for comp_name in readdir(micro_dir)
+            comp_dir = joinpath(micro_dir, comp_name)
+            for csv_name in readdir(comp_dir)
+                csv_path = joinpath(comp_dir, csv_name)
+                @assert occursin(".csv", csv_name)  "$matlab_tool_path/availability_series/$microscenario/$comp_name/$csv_name is not a CSV file"
+                csv_data = CSV.File(csv_path, delim=',') |> DataFrames.DataFrame
+                csv_hours = size(csv_data)[1]
+                @assert csv_hours >= n_hours  "$csv_hours hours are available in $csv_path. You cannot have $n_hours hours."
+                used_data = csv_data[1:n_hours,:]
+                new_comp_dir = joinpath(work_dir, "simulation_interface", "Input_series", "Availability", microscenario, comp_name)
+                mkpath(new_comp_dir)
+                new_csv_path = joinpath(new_comp_dir, csv_name)
+                CSV.write(new_csv_path, used_data, writeheader=true)
+            end
+        end
+    end
+    rm(joinpath(matlab_tool_path, "grid_model.m"))
+    rm(joinpath(matlab_tool_path, "availability_series"), recursive=true)
 end
 
-
-# The code below enables to test the simulation inputs building
+#=
+# Code to test the functions in this script:
 println("Builds simulation inputs")
-build_simulation_inputs(joinpath(pwd(), "studies\\simple_use_case"), 100)
+build_simulation_inputs(joinpath(pwd(), "studies\\simple_use_case"), 3)
 println("Simulation inputs building finished")
+=#

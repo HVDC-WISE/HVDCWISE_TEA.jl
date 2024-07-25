@@ -9,6 +9,10 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2024-07-25
+### Changed
+- run_study() in run_study.jl enables to run a study from user inputs to simulation results. A user intervention is needed to run a Matlab code to generate the availability series.
+
 ## [add_tests] - 2024-07-23
 ### Added
 - contingencies_generation (for N-1 only)
