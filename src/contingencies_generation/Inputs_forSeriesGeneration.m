@@ -2,7 +2,7 @@
 
 mpc = grid_model;  % Matpower file name (to load the grid)
 N = 5; % Number of time series to be sampled (for N-1 independent unavailabilities)
-output_folder = ["availability_series"]
+output_folder = ['availability_series']
 
 %%% --- Reliability data ---
 
