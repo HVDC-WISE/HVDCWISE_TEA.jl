@@ -43,6 +43,24 @@ function parse_data(path2grid::String, path2data::Vector{String}; kwargs...)
     return mn_data
 end
 
+function parse_data(path2data::Vector{String}, sn_data::Dict{String, <:Any}, nw_ids::AbstractVector{Int}; kwargs...)
+
+    pop!(sn_data, "dim", nothing)
+    # Parse time series data withing given interval
+    time_series, _ = parse_timeseries(path2data, sn_data; nw_ids=nw_ids)
+    # Add hour dimension to single-network data
+    _FP.add_dimension!(sn_data, :hour, length(nw_ids))
+    offset_dimension!(sn_data, nw_ids)
+    # Adjust offset of time slice
+    sn_data["dim"][:offset] = first(nw_ids) - 1
+    # Create the multinetwork data dictionary
+    mn_data = _FP.make_multinetwork(sn_data, time_series; share_data=false)
+    # Convert the DC grid (if any) of each single-network model to multi-conductor
+    _PMMCDC.make_multiconductor!(mn_data)
+
+    return mn_data
+end
+
 function parse_data(path2grid::String, path2data::Vector{String}, num::Int; kwargs...)
 
     # Parse initial single-network structure
@@ -50,22 +68,22 @@ function parse_data(path2grid::String, path2data::Vector{String}, num::Int; kwar
     # Parse time series data
     time_series, hours = parse_timeseries(path2data, sn_data)
     # Keep only first `num` steps of the time series
-    hours = hours > num ? num : hours
+    num = hours > num ? num : hours
     for comp in values(time_series)
         for var in values(comp)
             for array in values(var)
-                keepat!(array, 1:hours)
+                keepat!(array, 1:num)
             end
         end
     end
     # Add hour dimension to single-network data
-    _FP.add_dimension!(sn_data, :hour, hours)
+    _FP.add_dimension!(sn_data, :hour, num)
     # Create the multinetwork data dictionary
     mn_data = _FP.make_multinetwork(sn_data, time_series; share_data=false)
     # Convert the DC grid (if any) of each single-network model to multi-conductor
     _PMMCDC.make_multiconductor!(mn_data)
 
-    return mn_data
+    return mn_data, hours
 end
 
 function parse_data(path2grid::String; kwargs...)
@@ -78,7 +96,7 @@ function parse_data(path2grid::String; kwargs...)
     return sn_data
 end
 
-function parse_timeseries(paths::Vector{String}, network::Dict{String, <:Any})
+function parse_timeseries(paths::Vector{String}, network::Dict{String, <:Any}; nw_ids::Union{AbstractVector{Int}, Nothing} = nothing)
 
     dim = Int[]
     data = Dict{String, Any}()
@@ -106,7 +124,13 @@ function parse_timeseries(paths::Vector{String}, network::Dict{String, <:Any})
                 end
 
                 # Read timeseries data for the given component variable
-                df = CSV.read(joinpath(path, component, file), _DF.DataFrame, header=true)
+                if isnothing(nw_ids)
+                    df = CSV.read(joinpath(path, component, file), _DF.DataFrame, header=true)
+                else
+                    df = CSV.read(joinpath(path, component, file), _DF.DataFrame, header=true,
+                        skipto=first(nw_ids)+1, limit=length(nw_ids)
+                    )
+                end
                 # Check for NaN in timeseries data
                 if any(isnan.(Matrix(df)))
                     msg = "NaN values exist in timeseries for variable $var of component $component."

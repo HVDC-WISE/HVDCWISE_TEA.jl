@@ -1,4 +1,13 @@
 
+function offset_dimension!(data::Dict{String, Any}, nw_ids::AbstractVector{Int})
+
+    key = "dim"
+    data[key][:li] = collect(nw_ids)
+    data[key][:ci] = CartesianIndices(data[key][:li])
+    data[key][:offset] = first(nw_ids) - 1
+    return nothing
+end
+
 function slice_multinetwork(data::Dict{String, Any}, nw_ids::AbstractVector{Int})
 
     slice = Dict{String,Any}()

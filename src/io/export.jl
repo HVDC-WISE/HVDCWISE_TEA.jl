@@ -1,10 +1,13 @@
 
 function init_database(paths::Vector{Any}, model_type::Type, solver; kwargs...)
 
-    names = ["qg", "qs", "qsc", "qf", "qt", "qpr_fr", "qtf_to", "qconv", "qgrid", "iconv", "pdcg_shunt", "phi", "vmfilt", "vmconv", "vm"]
+    names = ["iconv", "iconv_dcg", "iconv_dcg_shunt", "ered", "eshift_down", "eshift_up",
+        "pdc", "pdcg", "pdcg_shunt", "phi", "ppr_fr", "ptf_to", "qg", "qs", "qsc", "qf", "qt", "qpr_fr", "qtf_to", "qconv", "qgrid",
+        "vafilt", "vmfilt", "vaconv", "vmconv", "vm"
+    ]
 
     # Solve exemplary model
-    grid = parse_data(paths..., 24)
+    grid, hours = parse_data(paths..., 24)
     results = solve_mc_acdcopf(grid, model_type, solver; kwargs...)["solution"]
     # Keep only results for one timestep
     grid = grid["nw"]["1"]
@@ -46,7 +49,7 @@ function init_database(paths::Vector{Any}, model_type::Type, solver; kwargs...)
             replace!(db[key][var], Inf=>NaN)
         end
     end
-    return db
+    return db, collect(range(stop=hours))
 end
 
 
