@@ -34,6 +34,6 @@ function run_tea(path2grid::String, path2data::String, interval::Int, model_type
     # Instantiate power system model
     network = parse_file(path2grid)
     # Solve OPF for multiple scenarios in parallel
-    _DC.pmap(x -> run_opf(x, network, hours, interval, database, model_type, solver; kwargs...), scenarios)
+    _DC.pmap(x -> run_opf(x, network, hours, interval, database, model_type, solver; kwargs...), scenarios; on_error=identity)
     _DC.rmprocs(_DC.workers())
 end
