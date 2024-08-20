@@ -18,7 +18,9 @@ function add_gen_operation_cost!(cost, pm::_PM.AbstractPowerModel, n::Int)
 
     for (i, gen) in _PM.ref(pm, n, :gen)
         pg = _PM.var(pm, n, :pg, i)
-        if length(gen["cost"]) == 1
+        if length(gen["cost"]) == 0
+            cost_expr = 0
+        elseif length(gen["cost"]) == 1
             cost_expr = gen["cost"][1]
         elseif length(gen["cost"]) == 2
             cost_expr = gen["cost"][1]*pg + gen["cost"][2]
