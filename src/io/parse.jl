@@ -43,22 +43,27 @@ function parse_data(path2grid::String, path2data::Vector{String}; kwargs...)
     return mn_data
 end
 
-function parse_data(path2data::Vector{String}, sn_data::Dict{String, <:Any}, nw_ids::AbstractVector{Int}; kwargs...)
+function parse_data(path2data::Vector{String}, data_sn::Dict{String, <:Any}, nw_ids::AbstractVector{Int}; kwargs...)
 
-    pop!(sn_data, "dim", nothing)
+    pop!(data_sn, "dim", nothing)
+    data_sn = deepcopy(data_sn)
     # Parse time series data withing given interval
-    time_series, _ = parse_timeseries(path2data, sn_data; nw_ids=nw_ids)
+    time_series, _ = parse_timeseries(path2data, data_sn; nw_ids=nw_ids)
     # Add hour dimension to single-network data
-    _FP.add_dimension!(sn_data, :hour, length(nw_ids))
-    offset_dimension!(sn_data, nw_ids)
-    # Adjust offset of time slice
-    sn_data["dim"][:offset] = first(nw_ids) - 1
+    _FP.add_dimension!(data_sn, :hour, length(nw_ids))
+    offset_dimension!(data_sn, nw_ids)
     # Create the multinetwork data dictionary
-    mn_data = _FP.make_multinetwork(sn_data, time_series; share_data=false)
+    data_mn = make_multinetwork(data_sn, time_series)
     # Convert the DC grid (if any) of each single-network model to multi-conductor
-    _PMMCDC.make_multiconductor!(mn_data)
+    if !haskey(time_series, "busdc") && haskey(data_sn, "busdc")
+        nw = first(nw_ids)
+        make_multiconductor!(data_mn["nw"]["$nw"]; components=["busdc"])
+        make_multiconductor!(data_mn; components=["convdc", "branchdc"])
+    else
+        make_multiconductor!(data_mn)
+    end
 
-    return mn_data
+    return data_mn
 end
 
 function parse_data(path2grid::String, path2data::Vector{String}, num::Int; kwargs...)
