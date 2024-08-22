@@ -7,6 +7,7 @@ function objective_min_fuel_cost(pm::_PM.AbstractPowerModel)
     for n in _PM.nw_ids(pm)
         add_gen_operation_cost!(cost, pm, n)
         add_load_operation_cost!(cost, pm, n)
+        add_slack_operation_cost!(cost, pm, n)
     end
     JuMP.@objective(pm.model, Min, cost)
 end
