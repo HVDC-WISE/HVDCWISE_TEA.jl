@@ -8,7 +8,7 @@ end
 function solve_mc_acdcopf(data::Dict{String,Any}, model_type::Type, solver; kwargs...)
     return _PM.solve_model(
         data, model_type, solver, build_mc_acdcopf;
-        ref_extensions=[_FP.ref_add_gen!, _FP.ref_add_storage!, _CBA.ref_add_pst!, _PMMCDC.add_ref_dcgrid!, ref_add_flex_load!],
+        ref_extensions=[_FP.ref_add_gen!, _FP.ref_add_storage!, _PMMCDC.add_ref_dcgrid!, ref_add_flex_load!, ref_add_pst!],
         solution_processors = [_PM.sol_data_model!],
         multinetwork = haskey(data, "dim") ? true : false,
         kwargs...
@@ -23,13 +23,11 @@ function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true, slac
         # AC grid variables
         _PM.variable_bus_voltage(pm; nw = n)
         _PM.variable_branch_power(pm; nw = n)
+        _PM.variable_branch_transform_angle(pm; nw = n)
 
         # AC grid variables: generator
         _PM.variable_gen_power(pm; nw = n)
         _FP.expression_gen_curtailment(pm; nw = n)
-
-        # AC grid variables: phase-shift transformer
-        _CBA.variable_pst(pm; nw = n)
 
         # AC grid variables: flexible demand
         variable_flexible_demand(pm; nw = n)
@@ -74,17 +72,11 @@ function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true, slac
         end
 
         for i in _PM.ids(pm, n, :branch)
-            _PM.constraint_ohms_yt_from(pm, i; nw = n)
-            _PM.constraint_ohms_yt_to(pm, i; nw = n)
+            _PM.constraint_ohms_y_pst_from(pm, i; nw = n)
+            _PM.constraint_ohms_y_pst_to(pm, i; nw = n)
             _PM.constraint_voltage_angle_difference(pm, i; nw = n)
             _PM.constraint_thermal_limit_from(pm, i; nw = n)
             _PM.constraint_thermal_limit_to(pm, i; nw = n)
-        end
-
-        for i in _PM.ids(pm, n, :pst)
-            _CBA.constraint_ohms_y_from_pst(pm, i; nw = n)
-            _CBA.constraint_ohms_y_to_pst(pm, i; nw = n)
-            _CBA.constraint_limits_pst(pm, i; nw = n)
         end
 
         for i in _PM.ids(pm, n, :flex_load)

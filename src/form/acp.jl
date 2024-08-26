@@ -33,7 +33,7 @@ end
 ## Constraints
 
 # Power balance of hybrid AC/DC multi-conductor network including storage & flexible demand
-function constraint_power_balance_ac(pm::_PM.AbstractACPModel, n::Int, i::Int, bus_arcs, bus_arcs_pst, bus_gens, bus_convs_ac, bus_loads, bus_shunts, bus_storage, gs, bs)
+function constraint_power_balance_ac(pm::_PM.AbstractACPModel, n::Int, i::Int, bus_arcs, bus_gens, bus_convs_ac, bus_loads, bus_shunts, bus_storage, gs, bs)
     vm            = _PM.var(pm, n,  :vm, i)
     p_slack_up    = _PM.var(pm, n, :p_slack_up, i)
     q_slack_up    = _PM.var(pm, n, :q_slack_up, i)
@@ -46,8 +46,6 @@ function constraint_power_balance_ac(pm::_PM.AbstractACPModel, n::Int, i::Int, b
     qg            = get(_PM.var(pm, n), :qg, Dict())
     ps            = get(_PM.var(pm, n), :ps, Dict())
     qs            = get(_PM.var(pm, n), :qs, Dict())
-    ppst          = get(_PM.var(pm, n), :ppst, Dict())
-    qpst          = get(_PM.var(pm, n), :qpst, Dict())
     pflex         = get(_PM.var(pm, n), :pflex, Dict())
     qflex         = get(_PM.var(pm, n), :qflex, Dict())
     pconv_grid_ac = get(_PM.var(pm, n), :pconv_tf_fr, Dict())
@@ -55,7 +53,6 @@ function constraint_power_balance_ac(pm::_PM.AbstractACPModel, n::Int, i::Int, b
 
     cstr_p = JuMP.@constraint(pm.model,
         sum(p[a] for a in bus_arcs)
-        + sum(ppst[a] for a in bus_arcs_pst)
         + sum(sum(pconv_grid_ac[c][d] for d in 1:length(_PM.var(pm, n, :pconv_tf_fr, c))) for c in bus_convs_ac)
         ==
         sum(pg[g] for g in bus_gens)
@@ -68,7 +65,6 @@ function constraint_power_balance_ac(pm::_PM.AbstractACPModel, n::Int, i::Int, b
 
     cstr_q = JuMP.@constraint(pm.model,
         sum(q[a] for a in bus_arcs)
-        + sum(qpst[a] for a in bus_arcs_pst)
         + sum(sum(qconv_grid_ac[c][d] for d in 1:length(_PM.var(pm, n, :qconv_tf_fr, c))) for c in bus_convs_ac)
         ==
         sum(qg[g] for g in bus_gens)

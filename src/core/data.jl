@@ -30,7 +30,6 @@ function process_additional_data!(data::Dict{String, Any})
     _add_dcgrid_data!(data)
     _add_storage_data!(data)
     _add_flexible_demand_data!(data)
-    _add_pst_data!(data)
     _delete_unused_properties!(data)
 end
 
@@ -88,20 +87,6 @@ function _add_storage_data!(data::Dict{String, Any})
         end
     else
         data["storage"] = Dict{String, Any}()
-    end
-end
-
-function _add_pst_data!(data::Dict{String, Any})
-    if haskey(data, "pst")
-        if !haskey(data, "multinetwork") || data["multinetwork"] == false
-            _CBA.to_pu_single_network_pst!(data)
-            _CBA.fix_data_single_network_pst!(data)
-        else
-            _CBA.to_pu_multi_network_pst!(data)
-            _CBA.fix_data_multi_network_pst!(data)
-        end
-    else
-        data["pst"] = Dict{String, Any}()
     end
 end
 

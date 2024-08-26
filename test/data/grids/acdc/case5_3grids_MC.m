@@ -88,6 +88,25 @@ mpc.branch_currents = [
                       100;
 ];
 
+% add new columns to "branch" matrix
+%column_names%	tm_min	tm_max	ta_min	ta_max
+mpc.branch_oltc_pst = [
+	1.0 1.0	0.0 0.0;
+	1.0 1.0	0.0 0.0;
+	1.0 1.0	0.0 0.0;
+	1.0 1.0	0.0 0.0;
+	1.0 1.0	0.0 0.0;
+	1.0 1.0	0.0 0.0;
+	1.0 1.0	0.0 0.0;
+	1.0 1.0	0.0 0.0;
+	1.0 1.0	0.0 0.0;
+	1.0 1.0	0.0 0.0;
+	1.0 1.0	0.0 0.0;
+	1.0 1.0	0.0 0.0;
+	1.0 1.0	0.0 0.0;
+	1.0 1.0	0.0 0.0;
+];
+
 %% DC bus
 %column_names% busdc_i grid Pdc Vdc basekVdc Vdcmax Vdcmin Cdc
 mpc.busdc = [
