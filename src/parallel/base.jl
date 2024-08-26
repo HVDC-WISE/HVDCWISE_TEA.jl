@@ -21,6 +21,8 @@ function run_opf(paths::Vector{Any}, network::Dict{String, <:Any}, hours::Vector
             Memento.error(_LOGGER, msg)
             break
         end
+        slice = Dict{String, Any}()
+        solution = Dict{String, Any}()
     end
 end
 

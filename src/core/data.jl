@@ -1,3 +1,12 @@
+
+"list of all `PowerModels`` unused properties in `HVDCWISE_TEA` optimisation model"
+const _UNUSED_VARS = Dict{String, Vector{String}}(
+    "gen" => ["apf", "pc1", "pc2", "qc1max", "qc1min", "qc2max", "qc2min", "ramp_10", "ramp_30",  "ramp_agc", "ramp_q", "shutdown", "startup"],
+    "load" => ["cost_inv", "ered_rel_max", "eshift_rel_max", "lifetime", "pf_angle", "tshift_down", "tshift_up"],
+    "convdc" => ["droop", "P_g", "Q_g", "Vdcset"],
+    "branchdc" => ["l", "c"]
+)
+
 """
     process_additional_data!(data::Dict{String,Any})
 
@@ -13,23 +22,7 @@ Optional tables are:
 
 Other tables may be added as well: they will be made available in the returned object, without any check.
 
-## Extended help
-
-The available `load_extra` table parameters are:
- - `flex` : boolean thta defines if load is flexible or not. If not flexible, only involutary curtailment is active.
- - `pf_angle` : fixed power factor angle in radians, giving the reactive power as `Q = P ⨉ tan(θ)`
- - `cost_curt` : compensation for involuntary load curtailment (i.e. involuntary demand reduction) [€/MWh];
- - `cost_red` : compensation for consuming less (i.e. voluntary demand reduction) [€/MWh];
- - `cost_shift` : Compensation for demand shifting, applied half to the power shifted upward and half to the power shifted downward [€/MWh]
- - `co2_cost` : CO2 costs for enabling flexible demand [€]
- - `pred_rel_max` : superior bound on voluntary load reduction (not consumed power) as a fraction of the total reference demand [p.u.];
- - `pshift_up_rel_max` : superior bound on upward demand shifted as a fraction of the total reference demand [p.u.];
- - `pshift_down_rel_max`: superior bound on downward demand shifted as a fraction of the total reference demand [p.u.];
- - `ered_rel_max` : superior bound on voluntary energy reduction as a fraction of the total reference demand [p.u.];
- - `eshift_rel_max` : superior bound on shifted energy as a fraction of the total reference demand [p.u.];
- - `tshift_up` : Recovery period for upward demand shifting [h];
- - `tshift_down` : Recovery period for downward demand shifting [h];
-
+By default, element properties that are not used in `HVDCWISE_TEA` mathematical model are removed.
 """
 function process_additional_data!(data::Dict{String, Any})
     
@@ -38,6 +31,7 @@ function process_additional_data!(data::Dict{String, Any})
     _add_storage_data!(data)
     _add_flexible_demand_data!(data)
     _add_pst_data!(data)
+    _delete_unused_properties!(data)
 end
 
 
@@ -54,15 +48,21 @@ function _add_flexible_demand_data!(data::Dict{String, Any})
 
     rescale_cost = x -> x*data["baseMVA"]
 
-    if !haskey(data, "load_extra")
-        for (i, load) in data["load"]
-            # Whether load is flexible (boolean)
-            load["flex"] = 0
-            # Compensation for load curtailment (i.e. involuntary demand reduction) (€/MWh)
-            load["cost_curt"] = 3000
-            _PM._apply_func!(load, "cost_curt", rescale_cost)
-        end
+    if haskey(data, "load_extra")
+        cost_curt = maximum(getindex.(values(data["load_extra"]), "cost_curt"))
     else
+        cost_curt = 3000
+    end
+
+    for (i, load) in data["load"]
+        # Whether load is flexible (boolean)
+        load["flex"] = 0
+        # Compensation for load curtailment (i.e. involuntary demand reduction) (€/MWh)
+        load["cost_curt"] = cost_curt
+        _PM._apply_func!(load, "cost_curt", rescale_cost)
+    end
+
+    if haskey(data, "load_extra")
         for (i, load_extra) in data["load_extra"]
             # ID of load point
             idx = load_extra["load_id"]
@@ -73,8 +73,8 @@ function _add_flexible_demand_data!(data::Dict{String, Any})
             _PM._apply_func!(data["load"]["$idx"], "cost_curt", rescale_cost)
             _PM._apply_func!(data["load"]["$idx"], "cost_red", rescale_cost)
             _PM._apply_func!(data["load"]["$idx"], "cost_shift", rescale_cost)
-            delete!(data, "load_extra")
         end
+        delete!(data, "load_extra")
     end
 end
 
@@ -103,6 +103,14 @@ function _add_pst_data!(data::Dict{String, Any})
     else
         data["pst"] = Dict{String, Any}()
     end
+end
+
+function _delete_unused_properties!(data::Dict{String, Any})
+
+    for (key, names) in _UNUSED_VARS
+        delete!.(values(data[key]), permutedims(names))
+    end
+    return nothing
 end
 
 
