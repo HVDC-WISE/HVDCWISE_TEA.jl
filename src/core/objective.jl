@@ -7,6 +7,7 @@ function objective_min_fuel_cost(pm::_PM.AbstractPowerModel)
     for n in _PM.nw_ids(pm)
         add_gen_operation_cost!(cost, pm, n)
         add_load_operation_cost!(cost, pm, n)
+        add_slack_operation_cost!(cost, pm, n)
     end
     JuMP.@objective(pm.model, Min, cost)
 end
@@ -18,7 +19,9 @@ function add_gen_operation_cost!(cost, pm::_PM.AbstractPowerModel, n::Int)
 
     for (i, gen) in _PM.ref(pm, n, :gen)
         pg = _PM.var(pm, n, :pg, i)
-        if length(gen["cost"]) == 1
+        if length(gen["cost"]) == 0
+            cost_expr = 0
+        elseif length(gen["cost"]) == 1
             cost_expr = gen["cost"][1]
         elseif length(gen["cost"]) == 2
             cost_expr = gen["cost"][1]*pg + gen["cost"][2]

@@ -16,7 +16,7 @@ function solve_mc_acdcopf(data::Dict{String,Any}, model_type::Type, solver; kwar
 end
 
 
-function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true)
+function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true, slack::Bool=true)
 
     for n in _FP.nw_ids(pm)
 
@@ -33,6 +33,10 @@ function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true)
 
         # AC grid variables: flexible demand
         variable_flexible_demand(pm; nw = n)
+        # AC bus slack variables
+        if slack
+            variable_slack_power(pm; nw = n)
+        end
 
         # AC grid variables: storage
         if haskey(pm.data, "dim")
@@ -41,7 +45,7 @@ function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true)
         end
 
         # AC/DC converter variables
-        _PMMCDC.variable_mcdc_converter(pm; nw = n)
+        variable_mcdc_converter(pm; nw = n)
 
         # DC grid variables
         _PMMCDC.variable_mcdcgrid_voltage_magnitude(pm; nw = n)
