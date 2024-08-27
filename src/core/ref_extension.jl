@@ -1,18 +1,4 @@
-
-"Add to `ref` the keys for handling phase-shift transformers"
-function ref_add_pst!(ref::Dict{Symbol, Any}, data::Dict{String, Any})
-
-    for (n, nw_ref) in ref[:it][_PM.pm_it_sym][:nw]
-
-        if haskey(first(values(nw_ref[:branch])), "ta_min")
-            break
-        end
-        for (i, branch) in nw_ref[:branch]
-            branch["ta_min"] = 0.0
-            branch["ta_max"] = 0.0
-        end
-    end
-end
+## Flexible loads
 
 "Add to `ref` the keys for handling flexible demand"
 function ref_add_flex_load!(ref::Dict{Symbol,<:Any}, data::Dict{String,<:Any})

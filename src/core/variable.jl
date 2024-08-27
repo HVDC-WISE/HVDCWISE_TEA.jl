@@ -1,24 +1,3 @@
-"variable: `ta[l]` for `l` in `branch`es"
-function variable_branch_transform_angle(pm::_PM.AbstractPowerModel; nw::Int=nw_id_default, bounded::Bool=true, report::Bool=true)
-    ta = _PM.var(pm, nw)[:ta] = JuMP.@variable(pm.model,
-        [i in _PM.ids(pm, nw, :branch)], base_name="$(nw)_ta",
-        start = _PM.comp_start_value(ref(pm, nw, :branch, i), "ta_start")
-    )
-
-    if bounded
-        for (i, branch) in ref(pm, nw, :branch)
-            if branch["ta_min"] == branch["ta_max"]
-                JuMP.fix(ta[i], branch["ta_min"])
-            else
-                JuMP.set_lower_bound(ta[i], branch["ta_min"])
-                JuMP.set_upper_bound(ta[i], branch["ta_max"])
-            end
-        end
-    end
-
-    report && _PM.sol_component_value(pm, nw, :branch, :ta, _PM.ids(pm, nw, :branch), ta)
-end
-
 
 "variables for flexible load"
 function variable_flexible_demand(pm::_PM.AbstractPowerModel; kwargs...)
