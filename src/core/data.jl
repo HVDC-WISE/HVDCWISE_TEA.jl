@@ -108,7 +108,9 @@ end
 function _delete_unused_properties!(data::Dict{String, Any})
 
     for (key, names) in _UNUSED_VARS
-        delete!.(values(data[key]), permutedims(names))
+        if key in keys(data)
+            delete!.(values(data[key]), permutedims(names))
+        end
     end
     return nothing
 end

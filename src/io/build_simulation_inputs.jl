@@ -576,7 +576,7 @@ function build_availability_series(work_dir::String, n_hours::Int)
     # TODO build reliability_data.csv in matlab_tool_path from reliability_data.xlsx in work
 
     println("Run FinalScript_HvdcWise.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
-    a = readline()  # TODO automatically run src/contingencies_generator/FinalScript_HvdcWise.m
+    a = readline();  # TODO automatically run src/contingencies_generator/FinalScript_HvdcWise.m
     println("Building availability series")
 
     availability_series_dir = joinpath(matlab_tool_path, "availability_series")

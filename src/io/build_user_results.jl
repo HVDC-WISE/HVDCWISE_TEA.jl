@@ -10,7 +10,7 @@ function build_user_results(work_dir::String, base_mva::Int)
     macro_scenario = ""
     for fifo_name in readdir(simulation_dir)
         dir = joinpath(simulation_dir, fifo_name)
-        if isdir(dir) && fifo_name != "Inputs_series"
+        if isdir(dir) && fifo_name != "Input_series"
             @assert (macro_scenario == "") "Impossible to identify the simulation results directory.\n$(joinpath(simulation_dir, macro_scenario))\n$dir"
             macro_scenario = fifo_name
         end
@@ -24,7 +24,7 @@ function build_user_results(work_dir::String, base_mva::Int)
 end
 
 
-function gather_opf_results(work_dir::String, macro_scenario::String, base_mva::Int)
+function gather_opf_results(work_dir::String, macro_scenario::String, base_mva::Int)  # TODO add unit column in results
     simulation_results_dir = joinpath(work_dir, "simulation_interface", macro_scenario)
 
     result_folders = Vector{String}()
@@ -57,18 +57,14 @@ function gather_opf_results(work_dir::String, macro_scenario::String, base_mva::
                             comp_sheet = xf["Sheet1"]
                             XLSX.rename!(comp_sheet, component)
                         else
-                            #println("Add sheet $component")
                             XLSX.addsheet!(xf, component)  # Add sheet
                             comp_sheet = xf[component]
                         end
-                        comp_sheet[1, 1:3] = ["Time", "Micro-scenario", "Attribute"]
-                        # println("comp_sheet: $comp_sheet")
+                        comp_sheet[1, 1:4] = ["Time", "Micro-scenario", "Attribute", "Unit"]
                     end
                     for file_name in readdir(comp_folder)
                         if occursin(".csv", file_name)
-                            # println("attribute: $attribute")
                             attribute_file = joinpath(comp_folder, file_name)
-                            # println("attribute_file: $attribute_file")
                             attribute = file_name[1:length(file_name)-4]
                             # Read csv
                             csv_data = CSV.File(attribute_file, delim=',') |> DataFrames.DataFrame
@@ -76,9 +72,8 @@ function gather_opf_results(work_dir::String, macro_scenario::String, base_mva::
                             n_rows = XLSX.get_dimension(comp_sheet).stop.row_number
 
                             if n_rows in [0, 1]
-                                # println(names(csv_data))
                                 for (col, component_id) in enumerate(names(csv_data))
-                                    comp_sheet[1, col+3] = component_id
+                                    comp_sheet[1, col+4] = component_id
                                 end
                                 n_rows = 1
                             end
@@ -86,8 +81,10 @@ function gather_opf_results(work_dir::String, macro_scenario::String, base_mva::
                             if first(attribute) == 'p'
                                 # pu powers must be converted into MW
                                 base_value = base_mva
+                                unit = "MW"
                             else
                                 base_value = 1
+                                unit = "pu"
                             end
                             for component_id in names(csv_data)
                                 @assert component_id in comp_sheet[1,:]  "component_id $component_id is not in the Excel col names for $component: $(comp_sheet[1,:])"
@@ -100,6 +97,7 @@ function gather_opf_results(work_dir::String, macro_scenario::String, base_mva::
                             comp_sheet[n_rows+1:n_rows+n_hours, 1] = 1:n_hours
                             comp_sheet[n_rows+1:n_rows+n_hours, 2] = [micro_scenario_name for _ in 1:n_hours]
                             comp_sheet[n_rows+1:n_rows+n_hours, 3] = [attribute for _ in 1:n_hours]
+                            comp_sheet[n_rows+1:n_rows+n_hours, 4] = [unit for _ in 1:n_hours]
                         end
                     end
                 end
