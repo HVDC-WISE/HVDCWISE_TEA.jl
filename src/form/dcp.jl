@@ -6,6 +6,13 @@ function variable_slack_power(pm::_PM.AbstractDCPModel; kwargs...)
     variable_slack_power_real(pm; kwargs...)
 end
 
+"variables for flexible load"
+function variable_flexible_demand(pm::_PM.AbstractDCPModel; kwargs...)
+    variable_demand_reduction(pm; kwargs...)
+    variable_demand_shifting_upwards(pm; kwargs...)
+    variable_demand_shifting_downwards(pm; kwargs...)
+end
+
 "variables for AC/DC converters"
 function variable_mcdc_converter(pm::_PM.AbstractDCPModel; kwargs...)
     variable_conv_tranformer_flow(pm; kwargs...)
@@ -37,7 +44,19 @@ end
 
 ## Constraints
 
-# Power balance of hybrid AC/DC multi-conductor network including storage & flexible demand
+"constraint on total active power demand accounting for all flexibility components"
+function constraint_flexible_demand(pm::_PM.AbstractDCPModel, n::Int, i, pd, pf_angle)
+    pflex       = _PM.var(pm, n, :pflex, i)
+    pred        = _PM.var(pm, n, :pred, i)
+    pshift_up   = _PM.var(pm, n, :pshift_up, i)
+    pshift_down = _PM.var(pm, n, :pshift_down, i)
+
+    if !JuMP.is_fixed(pflex)
+        JuMP.@constraint(pm.model, pflex == pd - pred + pshift_up - pshift_down)
+    end
+end
+
+"nodal power balance constraint of hybrid AC/DC multi-conductor network including storage & flexible demand"
 function constraint_power_balance_ac(pm::_PM.AbstractDCPModel, n::Int, i::Int, bus_arcs, bus_arcs_pst, bus_gens, bus_convs_ac, bus_loads, bus_shunts, bus_storage, gs, bs)
     p_slack_up    = get(_PM.var(pm, n), :p_slack_up, Dict(i => 0.0))[i]
     p_slack_down  = get(_PM.var(pm, n), :p_slack_down, Dict(i => 0.0))[i]
@@ -71,13 +90,10 @@ end
 
 ## Expressions
 
-
-## Expressions
-
 "expression for nodal slack power cost"
 function add_slack_operation_cost!(cost, pm::_PM.AbstractDCPModel, n::Int)
 
-    value = _PM.ref(pm, n, :baseMVA) * 50000
+    value = maximum(getindex.(values(_PM.ref(pm, n, :load)), "cost_curt"))
     for (i, bus) in _PM.ref(pm, n, :bus)
         p_slack_up   = get(_PM.var(pm, n), :p_slack_up, Dict(i => 0.0))[i]
         p_slack_down = get(_PM.var(pm, n), :p_slack_down, Dict(i => 0.0))[i]

@@ -16,7 +16,7 @@ function solve_mc_acdcopf(data::Dict{String,Any}, model_type::Type, solver; kwar
 end
 
 
-function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true, slack::Bool=true)
+function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true)
 
     for n in _FP.nw_ids(pm)
 
@@ -24,22 +24,23 @@ function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true, slac
         _PM.variable_bus_voltage(pm; nw = n)
         _PM.variable_branch_power(pm; nw = n)
 
-        # AC grid variables: generator
+        # AC generators
         _PM.variable_gen_power(pm; nw = n)
         _FP.expression_gen_curtailment(pm; nw = n)
 
-        # AC grid variables: phase-shift transformer
+        # AC phase-shift transformer
         _CBA.variable_pst(pm; nw = n)
 
-        # AC grid variables: flexible demand
-        variable_flexible_demand(pm; nw = n)
         # AC bus slack variables
-        if slack
-            variable_slack_power(pm; nw = n)
-        end
+        variable_slack_power(pm; nw = n)
 
-        # AC grid variables: storage
+        # AC load
+        variable_total_demand(pm; nw = n)
+
         if haskey(pm.data, "dim")
+            # Flexible demand
+            variable_flexible_demand(pm; nw = n)
+            # Storage
             _PM.variable_storage_power(pm; nw = n)
             _FP.variable_absorbed_energy(pm; nw = n)
         end
@@ -88,11 +89,7 @@ function build_mc_acdcopf(pm::_PM.AbstractPowerModel; objective::Bool=true, slac
         end
 
         for i in _PM.ids(pm, n, :flex_load)
-            _FP.constraint_total_flexible_demand(pm, i; nw = n)
-        end
-
-        for i in _PM.ids(pm, n, :fixed_load)
-            _FP.constraint_total_fixed_demand(pm, i; nw = n)
+            constraint_flexible_demand(pm, i; nw = n)
         end
 
         for i in _PM.ids(pm, n, :storage)
