@@ -15,22 +15,19 @@ addprocs(Sys.CPU_THREADS ÷ 2; exeflags = "--project=$(Base.active_project())")
     HVDCWISE_TEA.silence()
 end
 
-## Path and solver parameters
-
-hours = 96
-path2grid = joinpath(_HWTEA_dir, "test/data/grids/acdc/case39_mcdc.m")
-path2data = joinpath(_HWTEA_dir, "test/data/timeseries/example_mc")
-# path2grid = joinpath(_HWTEA_dir, "studies/39bus/case39_mcdc.m")
-# path2data = joinpath(_HWTEA_dir, "studies/39bus/1_week_without_storage")
-
+## Solver parameters
 optimizer = HVDCWISE_TEA.optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0)
 setting = Dict("output" => Dict("branch_flows" => true, "duals" =>false), "conv_losses_mp" => false);
 
+## Input files
+
+hours_per_subsimulation = 96  # The yearly problem is split into subproblems of this size (1 week is 168h)
+# path2grid = joinpath(_HWTEA_dir, "test/data/grids/acdc/case39_mcdc.m")
+# path2data = joinpath(_HWTEA_dir, "test/data/timeseries/example_mc")
+work_dir = joinpath(_HWTEA_dir, "studies\\simple_use_case")
+# work_dir = joinpath(_HWTEA_dir, "studies\\2024-08-23 case39")
+
 ## Solve the multiperiod OPF problem
 
-run_tea(path2grid, path2data, hours, _PM.DCPPowerModel, optimizer; setting = setting)
-
-# Gather results in an Excel file
-
-# macro_results_dir = joinpath(path2data, "results")
-# build_outputs_from_csv(macro_results_dir, 100, true)  # base_mva=100 in the .m file
+# run_tea(path2grid, path2data, hours_per_subsimulation, _PM.DCPPowerModel, optimizer; setting = setting)
+@time run_study(work_dir, hours_per_subsimulation)

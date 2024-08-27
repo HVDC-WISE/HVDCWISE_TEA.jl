@@ -3,17 +3,13 @@ using CSV
 import DataFrames
 using XLSX
 
-function build_simulation_inputs(work_dir::String, n_availability_series::Int, base_mva::Int=100)
+function build_simulation_inputs(work_dir::String, base_mva::Int=100)
     model_data = build_grid_model(work_dir, base_mva)
     power_series_info = build_power_series(work_dir, base_mva, model_data)
     n_power_series = power_series_info["n_series"]  # Not used
     n_hours = power_series_info["n_hours"]
 
-    matlab_tool_path = joinpath(pwd(), "src", "contingencies_generation")
-    println("Run FinalScript_HvdcWise.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
-    a = readline()  # TODO automatically run src/contingencies_generator/FinalScript_HvdcWise.m
-    println("Building availability series")
-    build_availability_series(work_dir, n_hours, n_availability_series)
+    build_availability_series(work_dir, n_hours)
 end
 
 function base_to_pu(value::Float64, unit::String, base_mva::Int, base_kv::Int)
@@ -134,7 +130,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
         end
         for i in 4:n_rows
             if Set([comp_sheet[i,j] for j in 2:n_cols]) != Set(["missing"])  # The row is not empty
-                @assert !in("missing", [comp_sheet[i,j] for j in 2:n_cols])  "$model_path sheet $comp_name row $i. Some data is missing: $([comp_sheet[i,j] for j in 2:n_cols])"
+                @assert !in("missing", [string(comp_sheet[i,j]) for j in 2:n_cols])  "$model_path sheet $comp_name row $i. Some data is missing: $([comp_sheet[i,j] for j in 2:n_cols])"
                 @assert comp_sheet[i,2] == i-3  "$model_path sheet $comp_name row $i. $comp_name id should be $(i-3) instead of $(comp_sheet[i,2])"
                 comp_id = i-3
                 model_data[comp_name][comp_id] = Dict(comp_sheet[1,j] => comp_sheet[i,j] for j in 3:n_cols)
@@ -235,6 +231,8 @@ function build_grid_model(work_dir::String, base_mva::Int)
             @assert model_unit == "MW"
             matpower_branch_data["rateA"] = model_rating
         end
+        matpower_branch_data["rateB"] = matpower_branch_data["rateA"]
+        matpower_branch_data["rateC"] = matpower_branch_data["rateA"]
 
         model_resistance = model_branch_data["resistance"]
         model_unit = model_units["branch"]["resistance"]
@@ -294,6 +292,8 @@ function build_grid_model(work_dir::String, base_mva::Int)
             @assert model_unit == "MW"
             matpower_branchdc_data["rateA"] = model_rating
         end
+        matpower_branchdc_data["rateB"] = matpower_branchdc_data["rateA"]
+        matpower_branchdc_data["rateC"] = matpower_branchdc_data["rateA"]
 
         model_resistance = model_branchdc_data["resistance"]
         model_unit = model_units["branchdc"]["resistance"]
@@ -352,11 +352,11 @@ function build_grid_model(work_dir::String, base_mva::Int)
             matpower_data["gencost"][gen_id] = matpower_gencost_data
         else  # Non dispatchable generator
             matpower_ndgen_data = Dict()
-            for attribute in keys(default_data["gen"])
+            for attribute in keys(default_data["ndgen"])
                 matpower_ndgen_data[attribute] = default_data["ndgen"][attribute]["value"]
             end
-            matpower_gen_data["gen_bus"] = model_gen_data["bus id"]
-            matpower_gen_data["pref"] = model_gen_data["power rating"]
+            matpower_ndgen_data["gen_bus"] = model_gen_data["bus id"]
+            matpower_ndgen_data["pref"] = model_gen_data["power rating"]
             matpower_ndgen_data["cost_gen"] = cost_production
             matpower_ndgen_data["cost_curt"] = cost_curtailment
             matpower_data["ndgen"][gen_id] = matpower_ndgen_data
@@ -368,6 +368,8 @@ function build_grid_model(work_dir::String, base_mva::Int)
         model_load_data = model_data["load"][load_id]
         bus_id = model_load_data["bus id"]
         matpower_data["bus"][bus_id]["Pd"] = model_load_data["power rating"]
+        load_type = model_load_data["type"]
+        costs_load_data = costs_data["load"][load_type]
         if Set([model_load_data["max power shift up"], model_load_data["max power shift down"], model_load_data["max voluntary reduced power"]]) != Set([0])  # Flexible load
             matpower_load_extra_data = Dict()
             for attribute in keys(default_data["load_extra"])
@@ -377,6 +379,9 @@ function build_grid_model(work_dir::String, base_mva::Int)
             matpower_load_extra_data["pshift_up_rel_max"] = model_load_data["max power shift up"]
             matpower_load_extra_data["pshift_down_rel_max"] = model_load_data["max power shift down"]
             matpower_load_extra_data["pred_rel_max"] = model_load_data["max voluntary reduced power"]
+            matpower_load_extra_data["cost_shift"] = costs_load_data["shifting cost"]
+            matpower_load_extra_data["cost_red"] = costs_load_data["reduction cost"]
+            matpower_load_extra_data["cost_curt"] = costs_load_data["curtailment cost"]
             matpower_data["load_extra"][load_id] = matpower_load_extra_data
         end
     end
@@ -552,14 +557,30 @@ function build_power_series(work_dir::String, base_mva::Int, model_data::Dict)
     return Dict("n_series" => length(micro_scenarios), "n_hours" => n_hours)
 end
 
-function build_availability_series(work_dir::String, n_hours::Int, n_series::Int)
+function build_availability_series(work_dir::String, n_hours::Int)
+    reliability_path = joinpath(work_dir, "user_interface", "inputs", "reliability_data.xlsx")
+    @assert isfile(reliability_path)  "$reliability_inputs_path is not a file"
+    reliability_file = XLSX.readxlsx(reliability_path)
+    sheet_names = XLSX.sheetnames(reliability_file)
+    @assert "user_inputs" in sheet_names  "file $reliability_path should have a sheet 'user_inputs'"
+    reliability_sheet = reliability_file["user_inputs"]
+
+    reliability_data = DataFrames.DataFrame(reliability_sheet[:],:auto)
     matlab_tool_path = joinpath(pwd(), "src", "contingencies_generation")
+    reliability_csv_path = joinpath(matlab_tool_path, "reliability_data.csv")
+    CSV.write(reliability_csv_path, reliability_data, writeheader=false)
+
+    # series_data[!,"$id"] = [sheet[i,id+1]*unit_conversion for i in 2:n_hours+1]
+    
+
+    # TODO build reliability_data.csv in matlab_tool_path from reliability_data.xlsx in work
+
+    println("Run FinalScript_HvdcWise.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
+    a = readline()  # TODO automatically run src/contingencies_generator/FinalScript_HvdcWise.m
+    println("Building availability series")
 
     availability_series_dir = joinpath(matlab_tool_path, "availability_series")
-    micro_scenarios = readdir(availability_series_dir)
-    @assert length(micro_scenarios) >= n_series  "$(length(micro_scenarios)) availability series are available in $availability_series_dir. You cannot have $n_series series."
-    for i in 1:n_series
-        microscenario = micro_scenarios[i]
+    for microscenario in  readdir(availability_series_dir)
         micro_dir = joinpath(availability_series_dir, microscenario)
         for comp_name in readdir(micro_dir)
             comp_dir = joinpath(micro_dir, comp_name)
@@ -578,12 +599,13 @@ function build_availability_series(work_dir::String, n_hours::Int, n_series::Int
         end
     end
     rm(joinpath(matlab_tool_path, "grid_model.m"))
+    rm(joinpath(matlab_tool_path, "reliability_data.csv"))
     rm(joinpath(matlab_tool_path, "availability_series"), recursive=true)
 end
 
 #=
 # Code to test the functions in this script:
 println("Builds simulation inputs")
-build_simulation_inputs(joinpath(pwd(), "studies\\simple_use_case"), 3)
+build_simulation_inputs(joinpath(pwd(), "studies\\simple_use_case"))
 println("Simulation inputs building finished")
 =#

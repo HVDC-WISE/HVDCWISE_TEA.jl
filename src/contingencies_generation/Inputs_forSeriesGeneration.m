@@ -1,39 +1,51 @@
 %%% --- Main user inputs ---
 
 mpc = grid_model;  % Matpower file name (to load the grid)
-N = 5; % Number of time series to be sampled (for N-1 independent unavailabilities)
 output_folder = ['availability_series']
 
 %%% --- Reliability data ---
 
-% Generator
-MTTRgen_ac = 50; % hour
-FOR_genac = 0.03; % unavailability rate (forced outage rate)
+[Parameter,Value,Unit,Scope,Meaning] = textread( 'reliability_data.csv', '%s %s %s %s %s' ,'delimiter', ',' );
+sheet = [Parameter,Value,Unit,Scope,Meaning];
 
-% Transformer
-MTTRtr_ac = 768; % hour
-FOR_tr_ac = 0.02; % unavailability rate
+column_titles = {"Parameter", "Value", "Unit", "Scope", "Meaning"};
+for j = 1:5
+  assert(sheet{1,j} == column_titles{j}, strcat("First cell of column ", num2str(j), " should be ", column_titles{j}, ", not ", sheet{1,j}))
+end
 
-% Converter
-MTTRconv_dc = 50; % hour
-FOR_convdc = 0.05; % unavailability rate
+parameters = {"N",
+"MTTR_genac", % hour
+"FOR_genac", % unavailability rate (forced outage rate)
+"MTTR_trac",
+"FOR_trac",
+"MTTR_convdc",
+"FOR_convdc",
+"MTTR_ohlac", % hour (for normal events)
+"MTTR_ohlac_resil", % hour (for extreme events)
+"failurerate_fixe_ohlac", % per year
+"failurerate_perkm_ohlac", % per year per km
+"MTTRbr_ohldc",
+"MTTRbr_ohldc_resil",
+"failurerate_fixe_ohldc",
+"failurerate_perkm_ohldc",
+"MTTR_cabledc",
+"MTTR_cabledc_resil",
+"failurerate_perkm_cabledc",
+};
 
-% AC lines
-MTTRbr_ac = 16; % hour (for normal events)
-MTTRbr_ac_resil = 4*30*24; % hour (for extreme events)
-failurerate_fixe_br_ac = 0.22; % per year
-failurerate_perkm_br_ac = 0.52*1.6/100; % per year per km
+values = [];
+for i = 2:19
+  assert(Parameter{i} == parameters{i-1}, strcat("Parameter in cell A", num2str(i), " should be ", parameters{i-1}, ", not ", Parameter{i}))
+  values = [values, str2num(Value{i})];
+end
 
-% DC OHL
-MTTRbr_ohldc = 30; % hour (for normal events)
-MTTRbr_ohldc_resil = 4*30*24; % hour (for extreme events)
-failurerate_fixe_ohldc = 0.1; % per year
-failurerate_perkm_ohldc = 0.05/100; % per year per km
-
-% DC cable
-MTTRcable_dc = 1500; % hour (for normal events)
-MTTRcable_dc_resil = 1500; % hour (for extreme events)
-failurerate_perkm_cabledc = 0.07/100; % per year per km
+N = values(1) % Number of time series to be sampled (for N-1 independent unavailabilities)
+[MTTR_genac, FOR_genac] = deal(num2cell(values(2:3)){:}) % Generator
+[MTTR_trac, FOR_trac] = deal(num2cell(values(4:5)){:}) % Transformer
+[MTTR_convdc, FOR_convdc] = deal(num2cell(values(6:7)){:}) % Converter
+[MTTR_ohlac, MTTR_ohlac_resil, failurerate_fixe_ohlac, failurerate_perkm_ohlac] = deal(num2cell(values(8:11)){:}) % AC lines
+[MTTRbr_ohldc, MTTRbr_ohldc_resil, failurerate_fixe_ohldc, failurerate_perkm_ohldc] = deal(num2cell(values(12:15)){:}) % DC OHL
+[MTTR_cabledc, MTTR_cabledc_resil, failurerate_perkm_cabledc] = deal(num2cell(values(16:18)){:}) % DC cable
 
 % Correlation between pole failures
 corr_dcpoles_adequacy = 0.5; % correlation among the wires (P, N and R) of DC branches for adequacy assessment analyses on N-1 ctgs
@@ -93,21 +105,21 @@ iTrafi = find(mpc.branch(:,9)>0);
 LlineeDc = mpc.branchdc(idexdc,3)/0.002;
 
 % Generator
-MTTRsgen_ac = ones(1,size(mpc.gen,1)).*MTTRgen_ac;
+MTTRsgen_ac = ones(1,size(mpc.gen,1)).*MTTR_genac;
 MTTFsgen_ac = MTTRsgen_ac*(1/FOR_genac - 1);
 
 % Transformer
-MTTFbrs_ac(iTrafi) = MTTRtr_ac*(1/FOR_tr_ac - 1);
-MTTRbrs_ac(iTrafi) = MTTRtr_ac;
+MTTFbrs_ac(iTrafi) = MTTR_trac*(1/FOR_trac - 1);
+MTTRbrs_ac(iTrafi) = MTTR_trac;
 
 % Converter
-MTTRsconv_dc = ones(1,size(mpc.convdc,1)).*MTTRconv_dc;
+MTTRsconv_dc = ones(1,size(mpc.convdc,1)).*MTTR_convdc;
 MTTFsconv_dc = MTTRsconv_dc.*(1/FOR_convdc - 1);
 
 % AC lines
-MTTRbrs_ac(LeLinee) = MTTRbr_ac;
-MTTRbrs_ac_resil = ones(1,length(MTTFbrs_ac))*MTTRbr_ac_resil;
-MTTFbrs_ac(LeLinee) = 8760./(Llinee*failurerate_perkm_br_ac + failurerate_fixe_br_ac);
+MTTRbrs_ac(LeLinee) = MTTR_ohlac;
+MTTRbrs_ac_resil = ones(1,length(MTTFbrs_ac))*MTTR_ohlac_resil;
+MTTFbrs_ac(LeLinee) = 8760./(Llinee*failurerate_perkm_ohlac + failurerate_fixe_ohlac);
 
 % DC OHL
 MTTRbrs_dc(find(mpc.branchdc(idexdc,17)==1)) = MTTRbr_ohldc; % suppose all are cables
@@ -115,6 +127,6 @@ MTTFbrs_dc(find(mpc.branchdc(idexdc,17)==1)) = 8760./(LlineeDc(find(mpc.branchdc
 MTTRbrs_dc_resil(find(mpc.branchdc(idexdc,17)==1)) = ones(1,length((find(mpc.branchdc(idexdc,17)==1))))*MTTRbr_ohldc_resil;
 
 % DC cable
-MTTRbrs_dc(find(mpc.branchdc(idexdc,17)==0)) = MTTRcable_dc; % suppose all are cables
+MTTRbrs_dc(find(mpc.branchdc(idexdc,17)==0)) = MTTR_cabledc; % suppose all are cables
 MTTFbrs_dc(find(mpc.branchdc(idexdc,17)==0)) = 8760./(LlineeDc(find(mpc.branchdc(idexdc,17)==0))'.*failurerate_perkm_cabledc);
-MTTRbrs_dc_resil(find(mpc.branchdc(idexdc,17)==0)) = ones(1,length(find(mpc.branchdc(idexdc,17)==0)))*MTTRcable_dc_resil;
+MTTRbrs_dc_resil(find(mpc.branchdc(idexdc,17)==0)) = ones(1,length(find(mpc.branchdc(idexdc,17)==0)))*MTTR_cabledc_resil;

@@ -8,9 +8,10 @@ format long
 % fiel for inputting data useful for simulations
 Inputs_forSeriesGeneration
 %
+
 switch type_of_unavailabilities
     case 0
-        disp('unavailabilities generated only for N-1 outages ')
+        disp('Generation of contingencies time series for N-1 outages')
     otherwise
         if type_of_unavailabilities == 1
             disp('unavailabilities generated only for N-k outages ')
@@ -1481,3 +1482,4 @@ if type_of_unavailabilities == 0 % FIXME 2 instead of 0
                         end
                         %%% END - GENERATION of N-1 and HVDC unavailabilities
                         warning on
+                        disp('Contingencies time series generation completed')

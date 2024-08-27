@@ -9,6 +9,15 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2024-08-27
+### Added
+- Reliability data taken from the user inputs
+- First post-processing file
+- template folder (for user inputs template files)
+### Fixed
+- Flexible load attributes missing in build_grid_model()
+- ndgen building in build_grid_model()
+
 ## [add_tests] - 2024-07-25
 ### Changed
 - run_study() in run_study.jl enables to run a study from user inputs to simulation results. A user intervention is needed to run a Matlab code to generate the availability series.
