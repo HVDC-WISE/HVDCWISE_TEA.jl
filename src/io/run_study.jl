@@ -13,7 +13,7 @@ function run_study(work_dir::String, hours::Int, base_mva::Int=100)
     println("Run simulation")
     run_simulation(work_dir, hours, base_mva)
 
-    println("Run resutls post-processing")
+    println("Run results post-processing")
     build_user_results(work_dir, base_mva)
 
     println("Study finished")

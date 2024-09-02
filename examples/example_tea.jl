@@ -33,4 +33,7 @@ work_dir = joinpath(_HWTEA_dir, "studies\\simple_use_case")
 ## Solve the multiperiod OPF problem
 
 # run_tea(path2grid, path2data, hours_per_subsimulation, _PM.DCPPowerModel, optimizer; setting = setting)
+
+# build_grid_model(work_dir, 100)
+# gather_opf_results(work_dir, "Macro", 100)
 @time run_study(work_dir, hours_per_subsimulation)

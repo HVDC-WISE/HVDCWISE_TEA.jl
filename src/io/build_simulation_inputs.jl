@@ -401,6 +401,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
         matpower_storage_data["discharge_rating"] = model_storage_data["production rating"]
         matpower_storage_data["charge_efficiency"] = model_storage_data["consumption efficiency"]
         matpower_storage_data["discharge_efficiency"] = model_storage_data["production efficiency"]
+        matpower_storage_data["thermal_rating"] = max(matpower_storage_data["charge_rating"], matpower_storage_data["discharge_rating"])
         matpower_data["storage"][storage_id] = matpower_storage_data
 
         matpower_storage_extra_data = Dict()
@@ -447,7 +448,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
         end
         write(f, "end\n")
     end
-    matlab_tool_path = joinpath(pwd(), "src", "contingencies_generation")
+    matlab_tool_path = joinpath(pwd(), "src", "matlab_tools")
     if isdir(joinpath(matlab_tool_path, "availability_series"))
         rm(joinpath(matlab_tool_path, "availability_series"), recursive=true)
     end
@@ -566,7 +567,7 @@ function build_availability_series(work_dir::String, n_hours::Int)
     reliability_sheet = reliability_file["user_inputs"]
 
     reliability_data = DataFrames.DataFrame(reliability_sheet[:],:auto)
-    matlab_tool_path = joinpath(pwd(), "src", "contingencies_generation")
+    matlab_tool_path = joinpath(pwd(), "src", "matlab_tools")
     reliability_csv_path = joinpath(matlab_tool_path, "reliability_data.csv")
     CSV.write(reliability_csv_path, reliability_data, writeheader=false)
 
@@ -576,7 +577,7 @@ function build_availability_series(work_dir::String, n_hours::Int)
     # TODO build reliability_data.csv in matlab_tool_path from reliability_data.xlsx in work
 
     println("Run FinalScript_HvdcWise.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
-    a = readline();  # TODO automatically run src/contingencies_generator/FinalScript_HvdcWise.m
+    a = readline();  # TODO automatically run src/computeKPI_script/FinalScript_HvdcWise.m
     println("Building availability series")
 
     availability_series_dir = joinpath(matlab_tool_path, "availability_series")
@@ -598,7 +599,7 @@ function build_availability_series(work_dir::String, n_hours::Int)
             end
         end
     end
-    rm(joinpath(matlab_tool_path, "grid_model.m"))
+    # rm(joinpath(matlab_tool_path, "grid_model.m"))  # This file will be deleted after results post-processing
     rm(joinpath(matlab_tool_path, "reliability_data.csv"))
     rm(joinpath(matlab_tool_path, "availability_series"), recursive=true)
 end
