@@ -1,5 +1,11 @@
 
-## Power balance
+"constraint on total flexible load power"
+function constraint_flexible_demand(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
+    load     = _PM.ref(pm, nw, :load, i)
+    pd       = load["pd"]
+    pf_angle = get(load, "pf_angle", 0.0)
+    constraint_flexible_demand(pm, nw, i, pd, pf_angle)
+end
 
 "Power balance of hybrid AC/DC network with storage & flexible demand"
 function constraint_power_balance_ac(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)

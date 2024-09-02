@@ -49,10 +49,6 @@ function add_load_operation_cost!(cost, pm::_PM.AbstractPowerModel, n::Int)
         JuMP.add_to_expression!(cost, 0.5*l["cost_shift"], _PM.var(pm, n, :pshift_up, i))
         JuMP.add_to_expression!(cost, 0.5*l["cost_shift"], _PM.var(pm, n, :pshift_down, i))
         JuMP.add_to_expression!(cost, l["cost_red"], _PM.var(pm, n, :pred, i))
-        JuMP.add_to_expression!(cost, l["cost_curt"], _PM.var(pm, n, :pcurt, i))
-    end
-    for (i, l) in _PM.ref(pm, n, :fixed_load)
-        JuMP.add_to_expression!(cost, l["cost_curt"], _PM.var(pm, n, :pcurt, i))
     end
     return cost
 end
