@@ -36,4 +36,6 @@ work_dir = joinpath(_HWTEA_dir, "studies\\simple_use_case")
 
 # build_grid_model(work_dir, 100)
 # gather_opf_results(work_dir, "Macro", 100)
+# run_simulation(work_dir, hours_per_subsimulation, 100)
+
 @time run_study(work_dir, hours_per_subsimulation)

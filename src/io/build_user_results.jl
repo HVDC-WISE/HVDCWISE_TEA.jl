@@ -20,9 +20,15 @@ function build_user_results(work_dir::String, base_mva::Int)
     matlab_tool_path = joinpath(pwd(), "src", "matlab_tools")
     write(joinpath(matlab_tool_path,"simulation_results_path.txt"), joinpath(simulation_dir, macro_scenario))
 
-    # Build user results (Matlab code)
+    # Build user results (Julia code)
     user_results_dir = joinpath(work_dir, "user_interface", "results")
     mkpath(user_results_dir)  # Create the folder if it does not exist yet
+    opf_results = gather_opf_results(work_dir, macro_scenario, base_mva)
+    opex = opex_summary(opf_results)
+    capex = capex_summary(work_dir)
+    totex = totex_summary(opex, capex)
+
+    # Build user results (Matlab code)
     println("Run computeKPI_script.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
     a = readline();  # TODO automatically run src/computeKPI_script/FinalScript_HvdcWise.m
     println("Computing KPIs")
@@ -30,12 +36,6 @@ function build_user_results(work_dir::String, base_mva::Int)
     # Delete study files in the matlab tool folder
     rm(joinpath(matlab_tool_path, "grid_model.m"))
     rm(joinpath(matlab_tool_path,"simulation_results_path.txt"))
-
-    # Build user results (Julia code)
-    opf_results = gather_opf_results(work_dir, macro_scenario, base_mva)
-    opex = opex_summary(opf_results)
-    capex = capex_summary(work_dir)
-    totex = totex_summary(opex, capex)
 end
 
 

@@ -9,6 +9,10 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2024-09-03
+### Added
+- KPI computation with Matlab code
+
 ## [add_tests] - 2024-08-27
 ### Added
 - Reliability data taken from the user inputs
