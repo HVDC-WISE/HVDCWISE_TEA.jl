@@ -16,6 +16,7 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 - main_attributes in build_outputs_from_json()
 ### Fixed
 - Solver double definition in example_tea.jl and run_study.jl
+- test_load_case.jl
 
 ## [add_tests] - 2024-08-27
 ### Added
