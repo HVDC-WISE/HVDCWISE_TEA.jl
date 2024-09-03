@@ -18,7 +18,7 @@ end
 ## Solver parameters
 
 setting = Dict("output" => Dict("branch_flows" => true, "duals" =>false), "conv_losses_mp" => false);
-setting_opt = Dict("solver" => "ipm", "ipm_iteration_limit" => 3000, "time_limit" => 3600.0, "output_flag" => false)
+setting_opt = Dict("presolve" => "on", "solver" => "ipm", "run_crossover" => "off", "ipm_iteration_limit" => 3000, "time_limit" => 3600.0, "output_flag" => false)
 optimizer = HVDCWISE_TEA.optimizer_with_attributes(HiGHS.Optimizer, setting_opt...)
 
 
