@@ -1,7 +1,7 @@
 
 
 
-function run_study(work_dir::String, hours::Int, base_mva::Int=100)
+function run_study(work_dir::String, hours::Int, base_mva::Int, optimizer, setting)
     simulation_dir = joinpath(work_dir, "simulation_interface")
     if isdir(simulation_dir)
         rm(simulation_dir, recursive=true)
@@ -11,7 +11,7 @@ function run_study(work_dir::String, hours::Int, base_mva::Int=100)
     build_simulation_inputs(work_dir, base_mva)
 
     println("Run simulation")
-    run_simulation(work_dir, hours, base_mva)
+    run_simulation(work_dir, hours, optimizer, setting)
 
     println("Run results post-processing")
     build_user_results(work_dir, base_mva)
@@ -20,15 +20,11 @@ function run_study(work_dir::String, hours::Int, base_mva::Int=100)
 end
 
 
-function run_simulation(work_dir::String, hours::Int, base_mva::Int=100)
+function run_simulation(work_dir::String, hours::Int, optimizer, setting)
     #Paths
     simulation_dir = joinpath(work_dir, "simulation_interface")
     path2grid = find_grid_path(simulation_dir)
     path2data = joinpath(simulation_dir, "Input_series")
-
-    ## Solver parameters
-    optimizer = HVDCWISE_TEA.optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0)
-    setting = Dict("output" => Dict("branch_flows" => true, "duals" =>false), "conv_losses_mp" => false);
     
     ## Solve the multiperiod OPF problem
     run_tea(path2grid, path2data, hours, _PM.DCPPowerModel, optimizer; setting = setting)

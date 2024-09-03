@@ -12,6 +12,10 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ## [add_tests] - 2024-09-03
 ### Added
 - KPI computation with Matlab code
+### Changed
+- main_attributes in build_outputs_from_json()
+### Fixed
+- Solver double definition in example_tea.jl and run_study.jl
 
 ## [add_tests] - 2024-08-27
 ### Added

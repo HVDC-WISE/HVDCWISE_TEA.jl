@@ -2,6 +2,7 @@ using Distributed
 using HVDCWISE_TEA
 import PowerModels as _PM
 import HiGHS
+import Ipopt
 
 const _HWTEA_dir = dirname(dirname(pathof(HVDCWISE_TEA)));
 
@@ -17,10 +18,18 @@ end
 
 ## Solver parameters
 
-setting = Dict("output" => Dict("branch_flows" => true, "duals" =>false), "conv_losses_mp" => false);
-setting_opt = Dict("presolve" => "on", "solver" => "ipm", "run_crossover" => "off", "ipm_iteration_limit" => 3000, "time_limit" => 3600.0, "output_flag" => false)
-optimizer = HVDCWISE_TEA.optimizer_with_attributes(HiGHS.Optimizer, setting_opt...)
+solver = "highs"
+# solver = "ipopt"
 
+if solver == "highs"
+    setting = Dict("output" => Dict("branch_flows" => true, "duals" =>false), "conv_losses_mp" => false);
+    setting_opt = Dict("presolve" => "on", "solver" => "ipm", "run_crossover" => "off", "ipm_iteration_limit" => 3000, "time_limit" => 3600.0, "output_flag" => false)
+    optimizer = HVDCWISE_TEA.optimizer_with_attributes(HiGHS.Optimizer, setting_opt...)
+else
+    @assert solver == "ipopt"
+    optimizer = HVDCWISE_TEA.optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0)
+    setting = Dict("output" => Dict("branch_flows" => true, "duals" =>false), "conv_losses_mp" => false);
+end
 
 ## Input files
 
@@ -38,4 +47,4 @@ work_dir = joinpath(_HWTEA_dir, "studies\\simple_use_case")
 # gather_opf_results(work_dir, "Macro", 100)
 # run_simulation(work_dir, hours_per_subsimulation, 100)
 
-@time run_study(work_dir, hours_per_subsimulation)
+@time run_study(work_dir, hours_per_subsimulation, 100, optimizer, setting)

@@ -116,11 +116,12 @@ function build_outputs_from_json(json_path::String)
     main_attributes = Dict(
         "branch" => ["pf", "pt"],
         "branchdc" => ["i_from", "i_to"],
-        "bus" => ["va"],
+        "bus" => ["p_slack_down", "p_slack_up", "va"],
         "busdc" => ["vm"],
-        "convdc" => ["iconv_dc", "iconv_dcg", "iconv_dcg_shunt", "pconv", "pdc", "pdcg", "pgrid", "ppr_fr", "ptf_to", "vaconv", "vafilt"],
+        "convdc" => ["iconv_dc", "pconv", "pgrid"],
         "gen" => ["pg", "pgcurt"],
-        "load" => ["pcurt", "pflex"],
+        "load" => ["pflex", "pred", "pshift_down", "pshift_up"],
+        "storage" => ["ps", "sc", "sd", "se"],
         )
     file_name = basename(json_path)
     case_name = file_name[1:length(file_name)-5]

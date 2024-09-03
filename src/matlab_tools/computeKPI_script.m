@@ -21,8 +21,6 @@ for k=1:length(folders)
 
     KPI.scenario_id{k}=folders(k).name;
 
-    data = csvread([folder_path, 'gen\pg.csv'], 1, 0); % Le "1" ici indique de commencer à lire à partir de la deuxième ligne
-
     # ps_storage{k,1}=readmatrix([folders(k).folder,'\',folders(k).name,'\storage\ps.csv'],'NumHeaderLines',1,'Delimiter',',')*mpc.baseMVA;
     ps_storage{k,1} = csvread([folder_path, 'storage\ps.csv'], 1, 0)*mpc.baseMVA;  # 1 and 0 means starting from row 2 and col 1
 
@@ -302,5 +300,5 @@ endfor
 
 xlswrite([user_results_dir, '\KPI_results.xlsx'], data);
 
-disp('KPI computation completed completed')
+disp('KPI computation completed')
 

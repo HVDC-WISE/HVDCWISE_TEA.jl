@@ -25,13 +25,13 @@ const save_results = true  # To save test results in Excel files
             @test output_series_1["1"]["branch"]["1"]["pt"] ≈ -8/baseMVA atol=1e-3
             @test output_series_1["1"]["branch"]["1"]["pf"] ≈ 8/baseMVA atol=1e-3
             @test output_series_1["1"]["load"]["1"]["pflex"] ≈ 8/baseMVA atol=1e-3
-            @test output_series_1["1"]["load"]["1"]["pcurt"] ≈ 0.0 atol=1e-3
+            @test output_series_1["1"]["load"]["1"]["pred"] ≈ 0.0 atol=1e-3
             # 10 MW generated and consumed on second timestep, 3 MW curtailed (13 MW demanded by load)
             @test output_series_1["2"]["gen"]["1"]["pg"] ≈ 10/baseMVA atol=1e-3
             @test output_series_1["2"]["branch"]["1"]["pt"] ≈ -10/baseMVA atol=1e-3
             @test output_series_1["2"]["branch"]["1"]["pf"] ≈ 10/baseMVA atol=1e-3
             @test output_series_1["2"]["load"]["1"]["pflex"] ≈ 10/baseMVA atol=1e-3
-            @test output_series_1["2"]["load"]["1"]["pcurt"] ≈ 3/baseMVA atol=1e-3
+            @test output_series_1["2"]["load"]["1"]["pred"] ≈ 3/baseMVA atol=1e-3
         else
             println("Error loading test01. Check CSV and .m files name and location.")
         end
@@ -86,36 +86,36 @@ const save_results = true  # To save test results in Excel files
             # Both lines are fully available: there is no load shedding.
             @test output_series_4["1"]["gen"]["1"]["pg"] ≈ 8.0/baseMVA atol=1e-3
             @test output_series_4["1"]["load"]["1"]["pflex"] ≈ 8.0/baseMVA atol=1e-3
-            @test output_series_4["1"]["load"]["1"]["pcurt"] ≈ 0.0/baseMVA atol=1e-3
+            @test output_series_4["1"]["load"]["1"]["pred"] ≈ 0.0/baseMVA atol=1e-3
             # t=2. 13 MW of load and 10 MW of available production.
             # Both lines are fully available: there is 3 MW of load shedding.
             @test output_series_4["2"]["gen"]["1"]["pg"] ≈ 10.0/baseMVA atol=1e-3
             @test output_series_4["2"]["load"]["1"]["pflex"] ≈ 10.0/baseMVA atol=1e-3
-            @test output_series_4["2"]["load"]["1"]["pcurt"] ≈ 3.0/baseMVA atol=1e-3
+            @test output_series_4["2"]["load"]["1"]["pred"] ≈ 3.0/baseMVA atol=1e-3
 
             # t=3. 8 MW of load and 10 MW of available production.
             # The AC line is unavailable so only 5 MW can be consumed by the load.
             @test output_series_4["3"]["gen"]["1"]["pg"] ≈ 5.0/baseMVA atol=1e-3
             @test output_series_4["3"]["load"]["1"]["pflex"] ≈ 5.0/baseMVA atol=1e-3
-            @test output_series_4["3"]["load"]["1"]["pcurt"] ≈ 3.0/baseMVA atol=1e-3
+            @test output_series_4["3"]["load"]["1"]["pred"] ≈ 3.0/baseMVA atol=1e-3
 
             # t=4. 8 MW of load and 10 MW of available production.
             # 1 pole of the DC line is unavailable so its power rating is halved to 2.5 MW: only 7.5 MW can be consumed by the load.
             @test output_series_4["4"]["gen"]["1"]["pg"] ≈ 7.5/baseMVA atol=1e-3
             @test output_series_4["4"]["load"]["1"]["pflex"] ≈ 7.5/baseMVA atol=1e-3
-            @test output_series_4["4"]["load"]["1"]["pcurt"] ≈ 0.5/baseMVA atol=1e-3
+            @test output_series_4["4"]["load"]["1"]["pred"] ≈ 0.5/baseMVA atol=1e-3
 
             # t=5. 8 MW of load and 10 MW of available production.
             # 1 pole of a converter is unavailable so its power rating is halved to 2.5 MW: only 7.5 MW can be consumed by the load.
             @test output_series_4["5"]["gen"]["1"]["pg"] ≈ 7.5/baseMVA atol=1e-3
             @test output_series_4["5"]["load"]["1"]["pflex"] ≈ 7.5/baseMVA atol=1e-3
-            @test output_series_4["5"]["load"]["1"]["pcurt"] ≈ 0.5/baseMVA atol=1e-3
+            @test output_series_4["5"]["load"]["1"]["pred"] ≈ 0.5/baseMVA atol=1e-3
 
             # t=6. 8 MW of load and 10 MW of available production.
             # The negative pole of the DC line & the positive pole of a converter are unavailable so the whole DC transmission is unavailable: only 5 MW can be consumed by the load.
             @test output_series_4["6"]["gen"]["1"]["pg"] ≈ 5.0/baseMVA atol=1e-3
             @test output_series_4["6"]["load"]["1"]["pflex"] ≈ 5.0/baseMVA atol=1e-3
-            @test output_series_4["6"]["load"]["1"]["pcurt"] ≈ 3.0/baseMVA atol=1e-3
+            @test output_series_4["6"]["load"]["1"]["pred"] ≈ 3.0/baseMVA atol=1e-3
         else
             println("Error loading test04. Check CSV and .m files name and location.")
         end
@@ -166,14 +166,14 @@ const save_results = true  # To save test results in Excel files
             for t in ["1", "2"]
             # t = 1 & 2: Demand=9 and Available=10 -> 1 MW consumed by the storage & 9 MW by the load (no load shedding)
                 @test output_series_5[t]["gen"]["1"]["pg"] ≈ 10/baseMVA atol=1e-3
-                @test output_series_5[t]["load"]["1"]["pcurt"] ≈ 0/baseMVA atol=1e-3
+                @test output_series_5[t]["load"]["1"]["pred"] ≈ 0/baseMVA atol=1e-3
                 @test output_series_5[t]["storage"]["1"]["ps"] ≈ 1/baseMVA atol=1e-3  # ps=sc-sd (storage power = chargin power - discharging power)
                 # @test output_series_5[t]["storage"]["1"]["sc"] ≈ 1/baseMVA atol=1e-3  # ps=sc-sd
             end
 
             # t=3: Demand=13 and Available=10 -> 2 MW produced by the storage (because its production power is limited to 2 MW) & 1 MW of load shedding
             @test output_series_5["3"]["gen"]["1"]["pg"] ≈ 10/baseMVA atol=1e-3
-            @test output_series_5["3"]["load"]["1"]["pcurt"] ≈ 1/baseMVA atol=1e-3
+            @test output_series_5["3"]["load"]["1"]["pred"] ≈ 1/baseMVA atol=1e-3
             @test output_series_5["3"]["storage"]["1"]["ps"] ≈ -2/baseMVA atol=1e-3
             # @test output_series_5["1"]["storage"]["1"]["sd"] ≈ 2/baseMVA atol=1e-3  # ps=sc-sd
         else
