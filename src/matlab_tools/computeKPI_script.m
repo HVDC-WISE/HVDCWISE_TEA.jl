@@ -109,7 +109,7 @@ for scenario=1:length(KPI.scenario_id)
 
     %% CO2 emissions
 
-    % emission table (missing, hypotesized proportional to gencost)
+    % emission table (missing, to be included within mpc file after removing the following line of code)
     mpc.CO2_emission_factors=[mpc.gencost(:,6);zeros(size(pg_gen{scenario},2)-size(mpc.gencost,1),1)];
 
 
@@ -126,14 +126,17 @@ for scenario=1:length(KPI.scenario_id)
 
 
     %% RES integration
-    % to be corrected
 
     if isfield(mpc, 'ndgen')
       % buses to which RES are connected
       busRES=mpc.ndgen(:,1);
 
-      % generation curtailment is negative
-      curtailmentRES=p_slack{scenario}(validTimesteps{scenario},busRES);
+    % replace NaN with 0   -- newly added
+    pg_curt{scenario}(isnan(pg_curt{scenario}))=0;
+    
+      % generation curtailment 
+      %OLD curtailmentRES=p_slack{scenario}(validTimesteps{scenario},busRES);
+      curtailmentRES=pg_curt{scenario}(validTimesteps{scenario},:);
       curtailmentRES(curtailmentRES<0.01)=0; % tolerance of 0.01 MW
 
       # RES=sum(curtailmentRES,'all');
@@ -147,7 +150,7 @@ for scenario=1:length(KPI.scenario_id)
 
     %% nonCO2 emissions
 
-    % emission table (missing, hypotesized proportional to gencost)
+    % emission table (missing, to be included within mpc file after removing the following line of code)
     mpc.nonCO2_emission_factors=[mpc.gencost(:,6);zeros(size(pg_gen{scenario},2)-size(mpc.gencost,1),1)];
 
 
@@ -248,16 +251,16 @@ for scenario=1:length(KPI.scenario_id)
     curtailmentLoad=p_slack{scenario}(validTimesteps{scenario},:);
     curtailmentLoad(curtailmentLoad<0.01)=0; % tolerance of 0.01 MW
 
-    # EENS=sum(curtailmentLoad,'all');
-    EENS=sum(sum(curtailmentLoad));
+    # ENS=sum(curtailmentLoad,'all');
+    ENS=sum(sum(curtailmentLoad));
 
     LOLE=sum(sum(curtailmentLoad,2)>0);
 
     % extrapolation for 1-year time horizon
-    EENS=EENS*8760/length(validTimesteps{scenario});
+    ENS=ENS*8760/length(validTimesteps{scenario});
     LOLE=LOLE*8760/length(validTimesteps{scenario});
 
-    KPI.EENS_MWh(scenario,1)=EENS;
+    KPI.ENS_MWh(scenario,1)=ENS;
     KPI.LOLE(scenario,1)=LOLE;
 
     %% Power (Energy) transferred by the HVDC grids
