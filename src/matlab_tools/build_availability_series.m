@@ -6,7 +6,7 @@ close all
 format long
 
 % fiel for inputting data useful for simulations
-Inputs_forSeriesGeneration
+read_reliability_data
 %
 
 switch type_of_unavailabilities

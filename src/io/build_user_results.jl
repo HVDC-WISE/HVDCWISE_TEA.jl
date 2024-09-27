@@ -29,8 +29,8 @@ function build_user_results(work_dir::String, base_mva::Int)
     totex = totex_summary(opex, capex)
 
     # Build user results (Matlab code)
-    println("Run computeKPI_script.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
-    a = readline();  # TODO automatically run src/computeKPI_script/FinalScript_HvdcWise.m
+    println("Run compute_KPIs.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
+    a = readline();  # TODO automatically run src/matlab_tools/compute_KPIs.m or recode it in Julia
     println("Computing KPIs")
 
     # Delete study files in the matlab tool folder

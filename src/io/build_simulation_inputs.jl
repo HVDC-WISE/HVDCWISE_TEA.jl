@@ -69,7 +69,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
     # Read default values and build a nested dictionary from it
     
     default_data = Dict("bus" => Dict(), "busdc" => Dict(), "branch" => Dict(), "branch_currents" => Dict(), "branchdc" => Dict(), 
-    "convdc" => Dict(), "gen" => Dict(), "gencost" => Dict(), "ndgen" => Dict(), 
+    "convdc" => Dict(), "emission_factors" => Dict(), "gen" => Dict(), "gencost" => Dict(), "ndgen" => Dict(), 
     "load_extra" => Dict(), "storage" => Dict(), "storage_extra" => Dict())
     sorted_default_attributes = Dict(comp_name => Vector{String}() for comp_name in keys(default_data))
 
@@ -79,11 +79,11 @@ function build_grid_model(work_dir::String, base_mva::Int)
     default_sheet = default_file["default"]
     n_rows = XLSX.get_dimension(default_sheet).stop.row_number
     n_cols = XLSX.get_dimension(default_sheet).stop.column_number
-    @assert n_rows >= 152 && n_cols >= 5  "Sheet 'default' of $default_path should have 152 rows and 5 columns, not $n_rows and $n_cols"
-    if n_rows > 152
-        @assert (Set([string(default_sheet[i,j]) for i in 152:n_rows for j in 1:5]) == "missing") "Rows > 152 should be empty in sheet 'default' of $default_path. $([default_sheet[i,j] for i in 152:n_rows for j in 1:5])"
+    @assert n_rows >= 153 && n_cols >= 5  "Sheet 'default' of $default_path should have 153 rows and 5 columns, not $n_rows and $n_cols"
+    if n_rows > 153
+        @assert (Set([string(default_sheet[i,j]) for i in 153:n_rows for j in 1:5]) == "missing") "Rows > 153 should be empty in sheet 'default' of $default_path. $([default_sheet[i,j] for i in 153:n_rows for j in 1:5])"
     end
-    n_rows = 152
+    n_rows = 153
     n_cols = 5
     @assert [default_sheet[1,j] for j in 1:5] == ["Component", "Attribute", "Unit", "Description", "Default value"] "$default_path sheet 'default' A1:E1 is $([default_sheet[1,j] for j in 1:5]) instead of [Component, Attribute, Unit, Description, Default value]"
     @assert (Set([default_sheet[i,1] for i in 2:n_rows]) == Set(keys(default_data)))  "components in default values should be $(Set(keys(default_data))), not $(Set([default_sheet[i,1] for i in 2:n_rows]))"
@@ -142,7 +142,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
     
     costs_attributes = Dict(
         "load" => ["curtailment cost", "reduction cost", "shifting cost"], 
-        "gen" => ["production cost", "curtailment cost"])
+        "gen" => ["production cost", "curtailment cost", "CO2 emission"])
     costs_units = Dict(comp_name => Dict() for comp_name in keys(costs_attributes))
     costs_data = Dict(comp_name => Dict() for comp_name in keys(costs_attributes))
 
@@ -177,7 +177,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
     # Build a dictionary containing all the required attributes for the matpower (.m) file, in their required units (be careful about when unit conversions are needed)
 
     matpower_data = Dict("bus" => Dict(), "busdc" => Dict(), "branch" => Dict(), "branch_currents" => Dict(), "branchdc" => Dict(), 
-                         "convdc" => Dict(), "gen" => Dict(), "gencost" => Dict(), "ndgen" => Dict(), 
+                         "convdc" => Dict(), "emission_factors" => Dict(), "gen" => Dict(), "gencost" => Dict(), "ndgen" => Dict(), 
                          "load_extra" => Dict(), "storage" => Dict(), "storage_extra" => Dict())
     @assert keys(matpower_data) == keys(default_data)
 
@@ -328,7 +328,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
         matpower_data["convdc"][conv_id] = matpower_conv_data
     end
 
-    # gen, gencost, ndgen
+    # gen, gencost, ndgen, emission factors
     for gen_id in keys(model_data["gen"])
         model_gen_data = model_data["gen"][gen_id]
         gen_type = model_gen_data["type"]
@@ -361,6 +361,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
             matpower_ndgen_data["cost_curt"] = cost_curtailment
             matpower_data["ndgen"][gen_id] = matpower_ndgen_data
         end
+        matpower_data["emission_factors"][gen_id] = Dict("CO2" => costs_gen_data["CO2 emission"])  # Other types of emissions (NOx, SO2, COV, particles, ...) could be added
     end
 
     # load (bus), load_extra
@@ -576,8 +577,8 @@ function build_availability_series(work_dir::String, n_hours::Int)
 
     # TODO build reliability_data.csv in matlab_tool_path from reliability_data.xlsx in work
 
-    println("Run FinalScript_HvdcWise.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
-    a = readline();  # TODO automatically run src/computeKPI_script/FinalScript_HvdcWise.m
+    println("Run build_availability_series.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
+    a = readline();  # TODO automatically run src/matlab_tools/build_availability_series.m or recode it in Julia
     println("Building availability series")
 
     availability_series_dir = joinpath(matlab_tool_path, "availability_series")

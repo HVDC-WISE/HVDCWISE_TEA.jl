@@ -9,6 +9,15 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2024-09-26
+### Added
+- Emission factors (only CO2) in KPI
+- Units in KPI results
+### Changed
+- matlab tool files refactoring
+### Fixed
+- KPI computation when empty folders in simulation results 
+
 ## [add_tests] - 2024-09-03
 ### Added
 - KPI computation with Matlab code
