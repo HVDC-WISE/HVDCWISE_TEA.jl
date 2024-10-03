@@ -9,6 +9,13 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2024-10-03
+### Changed
+- RES generators (ndgen) are the ones with generation_cost = 0
+### Fixed
+- KPI computation
+- build_grid_model. convdc power rating in MW and branch_currents in MW
+
 ## [add_tests] - 2024-09-26
 ### Added
 - Emission factors (only CO2) in KPI

@@ -264,7 +264,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
 
     # branch_currents
     for branch_id in keys(model_data["branch"])
-        matpower_data["branch_currents"][branch_id] = Dict("c_rating_a" => default_data["branch_currents"]["c_rating_a"]["value"])
+        matpower_data["branch_currents"][branch_id] = Dict("c_rating_a" => matpower_data["branch"][branch_id]["rateA"])
     end
 
     # branch_dc
@@ -320,7 +320,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
         end
         matpower_conv_data["busdc_i"] = model_conv_data["DC bus id"]
         matpower_conv_data["busac_i"] = model_conv_data["AC bus id"]
-        matpower_conv_data["Pacmax"] = base_to_pu(float(model_conv_data["power rating"]), "MW", base_mva, 0)
+        matpower_conv_data["Pacmax"] = model_conv_data["power rating"]  # "MW"
         matpower_conv_data["Pacmin"] = - matpower_conv_data["Pacmax"]
         matpower_conv_data["conv_confi"] = model_conv_data["configuration"]
         matpower_conv_data["connect_at"] = model_conv_data["connection type"]
@@ -335,7 +335,8 @@ function build_grid_model(work_dir::String, base_mva::Int)
         costs_gen_data = costs_data["gen"][gen_type]
         cost_production = costs_gen_data["production cost"]
         cost_curtailment = costs_gen_data["curtailment cost"]
-        if cost_curtailment == 0  # Dispatchable generator
+        if cost_production > 0  # Dispatchable generator
+            @assert cost_curtailment == 0  "Generator type $gen_type is dispatchable (production cost = $cost_production > 0). Its curtailment cost should be 0, not $cost_curtailment"
             matpower_gen_data = Dict()
             for attribute in keys(default_data["gen"])
                 matpower_gen_data[attribute] = default_data["gen"][attribute]["value"]
@@ -351,6 +352,8 @@ function build_grid_model(work_dir::String, base_mva::Int)
             matpower_gencost_data["c(1)"] = cost_production
             matpower_data["gencost"][gen_id] = matpower_gencost_data
         else  # Non dispatchable generator
+            @assert cost_production == 0  "Generator type $gen_type has a production cost < 0, which is not possible: $cost_production"
+            @assert cost_curtailment >= 0  "Generator type $gen_type has a curtailment cost < 0, which is not possible: $cost_curtailment"
             matpower_ndgen_data = Dict()
             for attribute in keys(default_data["ndgen"])
                 matpower_ndgen_data[attribute] = default_data["ndgen"][attribute]["value"]

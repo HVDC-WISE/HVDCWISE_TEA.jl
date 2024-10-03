@@ -106,7 +106,7 @@ for scenario_id=1:length(folders)
         for ndgen = number_of_dispatchable_gen+1:size(pg_gen,2)
             pg_gen(isnan(pg_gen(:,ndgen)),ndgen)=0;
             SEW = SEW + sum(pg_gen(validTimesteps,ndgen).*(maxPrice-mpc.ndgen(ndgen-number_of_dispatchable_gen,6)));
-            SEW = SEW - sum(pg_curt(validTimesteps,ndgen).*mpc.ndgen(ndgen-number_of_dispatchable_gen,7));
+            # SEW = SEW - sum(pg_curt(validTimesteps,ndgen).*mpc.ndgen(ndgen-number_of_dispatchable_gen,7));
         endfor
 
         SEW = SEW * 8760 / length(validTimesteps); % extrapolation for 1-year time horizon
@@ -256,7 +256,8 @@ endfor
 % - Convert KPI units -
 
 KPI_names = fieldnames(KPI);
-expected_KPI_names = {"scenario_name", "convergence", "SEW", "REScurtailment", "CO2emission", "Elosses", "ENS", "LOLE", "energyDC"};
+expected_KPI_names = {"scenario_name", "convergence", "SEW", "CO2emission", "REScurtailment", "Elosses", "ENS", "LOLE", "energyDC"};
+units = {"", "", "M€/y", "Mt/y", "TWh/y", "TWh/y", "TWh/y", "h/y", "TWh/y"};
 missing_KPIs = setdiff(expected_KPI_names, KPI_names);
 unexpected_KPIs = setdiff(KPI_names, expected_KPI_names);
 if length(missing_KPIs) > 0
@@ -266,28 +267,27 @@ elseif length(unexpected_KPIs) > 0
   display(unexpected_KPIs)
   error("Unexpected KPI names")
 endif
-units = {"", "", "M€/y", "TWh/y", "Mt/y", "TWh/y", "TWh/y", "h/y", "TWh/y"};
 
 KPI.SEW = KPI.SEW * MWh_to_TWh;
-KPI.REScurtailment = KPI.REScurtailment * MWh_to_TWh;
 KPI.CO2emission = KPI.CO2emission * t_to_Mt;
+KPI.REScurtailment = KPI.REScurtailment * MWh_to_TWh;
 KPI.Elosses = KPI.Elosses * MWh_to_TWh;
 KPI.ENS = KPI.ENS * MWh_to_TWh;
-KPI.ENS = KPI.LOLE * 1;
+KPI.LOLE = KPI.LOLE * 1;
 KPI.energyDC = KPI.energyDC * MWh_to_TWh;
 
 % - Create table of results and save them to excel -
 
-nCols = length(KPI_names);
+nCols = length(expected_KPI_names);
 nRows = length(KPI.scenario_name);
 
 data = cell(nRows+1, nCols);
-data(1, :) = KPI_names;
+data(1, :) = expected_KPI_names;
 data(2, :) = units;
 
 for i = 1:nRows
     for j = 1:nCols
-      data_ij = KPI.(KPI_names{j})(i);
+      data_ij = KPI.(expected_KPI_names{j})(i);  # expected_KPI_names is used instead of KPI_names to ensure coherence with units
       if isa(data_ij, 'cell')
         data_ij = data_ij{1};
       endif

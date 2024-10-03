@@ -22,7 +22,10 @@ function build_user_results(work_dir::String, base_mva::Int)
 
     # Build user results (Julia code)
     user_results_dir = joinpath(work_dir, "user_interface", "results")
-    mkpath(user_results_dir)  # Create the folder if it does not exist yet
+    if isdir(user_results_dir)
+        rm(user_results_dir, recursive=true)
+    end
+    mkpath(user_results_dir)
     opf_results = gather_opf_results(work_dir, macro_scenario, base_mva)
     opex = opex_summary(opf_results)
     capex = capex_summary(work_dir)
