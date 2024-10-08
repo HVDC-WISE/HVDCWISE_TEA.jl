@@ -173,7 +173,7 @@ for scenario_id=1:length(folders)
             for k=1:size(mpc.branchdc,1)
 
                 R=mpc.branchdc(k,3);
-                R0=mpc.branchdc(k,13);
+                R0=mpc.branchdc(k,12);
 
                 Elosses_dcbranch=Elosses_dcbranch +...
                     sum(i_dc(validTimesteps,k*3-2).^2)*R*mpc.baseMVA +...
@@ -196,7 +196,7 @@ for scenario_id=1:length(folders)
             Elosses_dctrafo=0;
             for k=1:size(mpc.convdc,1)
                 cosphi=0.95;
-                Rpu=mpc.convdc(k,9);
+                Rpu=mpc.convdc(k,9); % column rtf in mpc.convdc
                 Elosses_dctrafo=Elosses_dctrafo+...
                     sum(pconv_dc(validTimesteps,k*2-1).^2)*Rpu/mpc.baseMVA/cosphi^2+...
                     sum(pconv_dc(validTimesteps,k*2-0).^2)*Rpu/mpc.baseMVA/cosphi^2;

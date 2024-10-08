@@ -18,7 +18,7 @@ function base_to_pu(value::Float64, unit::String, base_mva::Int, base_kv::Int)
     elseif unit == "kV"
         return value / base_kv
     elseif unit == "kA"
-        return value *  (sqrt(3) * base_kv) / base_mva
+        return value *  base_kv / base_mva
     elseif unit == "Ohm"
         return value * base_mva / base_kv^2
     else
@@ -32,7 +32,7 @@ function pu_to_base(value::Float64, unit::String, base_mva::Int, base_kv::Int)
     elseif unit == "kV"
         return value * base_kv
     elseif unit == "kA"
-        return value * base_mva / (sqrt(3) * base_kv)
+        return value * base_mva / base_kv
     elseif unit == "Ohm"
         return value * base_kv^2 / base_mva
     else
@@ -101,8 +101,8 @@ function build_grid_model(work_dir::String, base_mva::Int)
         "bus" => ["base voltage"],
         "busdc" => ["base voltage"], 
         "branch" => ["from bus id",  "to bus id", "type", "power rating", "resistance", "reactance"], 
-        "branchdc" => ["from bus id",  "to bus id", "type", "power rating", "resistance"], 
-        "convdc" => ["AC bus id",  "DC bus id", "type", "power rating", "configuration", "connection type"],
+        "branchdc" => ["from bus id",  "to bus id", "type", "configuration", "power rating", "resistance"], 
+        "convdc" => ["AC bus id",  "DC bus id", "type", "configuration", "power rating"],
         "gen" => ["bus id", "type", "power rating"], 
         "load" => ["bus id", "type", "power rating", "max power shift up", "max power shift down", "max voluntary reduced power"], 
         "storage" => ["bus id", "type", "production rating", "consumption rating", "initial energy", "energy rating", "production efficiency", "consumption efficiency", "self discharge rate"])
@@ -264,7 +264,12 @@ function build_grid_model(work_dir::String, base_mva::Int)
 
     # branch_currents
     for branch_id in keys(model_data["branch"])
-        matpower_data["branch_currents"][branch_id] = Dict("c_rating_a" => matpower_data["branch"][branch_id]["rateA"])
+        from_bus = matpower_data["branch"][branch_id]["fbus"]
+        from_voltage = model_data["bus"][from_bus]["base voltage"]  # kV
+        power_rating = matpower_data["branch"][branch_id]["rateA"]  # MW
+        current_rating = power_rating / from_voltage / sqrt(3)  # kA
+        matpower_data["branch_currents"][branch_id] = Dict("c_rating_a" => power_rating)
+        # matpower_data["branch_currents"][branch_id] = Dict("c_rating_a" => power_rating / from_voltage / sqrt(3))
     end
 
     # branch_dc
@@ -281,6 +286,8 @@ function build_grid_model(work_dir::String, base_mva::Int)
         @assert from_voltage == to_voltage  "Branchdc $branch_id has different voltages at both terminals ($from_voltage kV at busdc $from_busdc and $to_voltage kV at busdc $to_busdc)"
         matpower_branchdc_data["fbusdc"] = from_busdc
         matpower_branchdc_data["tbusdc"] = to_busdc
+
+        matpower_branchdc_data["line_confi"] = model_branchdc_data["configuration"]
 
         model_rating = model_branchdc_data["power rating"]
         model_unit = model_units["branchdc"]["power rating"]
@@ -300,13 +307,14 @@ function build_grid_model(work_dir::String, base_mva::Int)
         default_unit = default_data["branchdc"]["r"]["unit"]
         @assert default_unit in ["pu", "p.u."]
         if model_unit == "Ohm"
-            # P = 2*V*I. V=R*I. P=2*V^2/R. R_base=2*V_base^2/P_base. TODO check pu conversion methodology.
+            # P = 2*V*I. V=R*I. P=2*V^2/R. R_base=V_base^2/P_base.
             resistance_ohm = model_resistance
         else
             @assert model_unit == "pu"
-            resistance_ohm = model_resistance * 2 * from_voltage^2 / matpower_branchdc_data["rateA"]  # Base power in the model data is the power rating instead of base_mva.
+            resistance_ohm = pu_to_base(float(model_resistance), "Ohm", matpower_branchdc_data["rateA"], from_voltage)  # Base power in the model data is the power rating instead of base_mva.
         end
-        matpower_branchdc_data["r"] = resistance_ohm / (2 * from_voltage^2 / base_mva)            
+        matpower_branchdc_data["r"] = base_to_pu(float(resistance_ohm), "Ohm", base_mva, from_voltage)  # Base power in the model data is the power rating instead of base_mva.
+        matpower_branchdc_data["return_z"] = matpower_branchdc_data["r"] * 5  # Default value: R0 = R * 5
 
         matpower_data["branchdc"][branchdc_id] = matpower_branchdc_data
     end
@@ -318,12 +326,32 @@ function build_grid_model(work_dir::String, base_mva::Int)
         for attribute in keys(default_data["convdc"])
             matpower_conv_data[attribute] = default_data["convdc"][attribute]["value"]
         end
-        matpower_conv_data["busdc_i"] = model_conv_data["DC bus id"]
-        matpower_conv_data["busac_i"] = model_conv_data["AC bus id"]
-        matpower_conv_data["Pacmax"] = model_conv_data["power rating"]  # "MW"
-        matpower_conv_data["Pacmin"] = - matpower_conv_data["Pacmax"]
+        
+        dc_bus = model_conv_data["DC bus id"]
+        ac_bus = model_conv_data["AC bus id"]
+        matpower_conv_data["busdc_i"] = dc_bus
+        matpower_conv_data["busac_i"] = ac_bus
+
         matpower_conv_data["conv_confi"] = model_conv_data["configuration"]
-        matpower_conv_data["connect_at"] = model_conv_data["connection type"]
+
+        conv_rating = model_conv_data["power rating"]  # "MW"
+        matpower_conv_data["Pacmax"] = conv_rating
+        matpower_conv_data["Pacmin"] = - conv_rating
+        matpower_conv_data["Qacmax"] = conv_rating
+        matpower_conv_data["Qacmin"] = - conv_rating
+
+        dc_voltage = model_data["busdc"][dc_bus]["base voltage"]
+        ac_voltage = model_data["bus"][dc_bus]["base voltage"]
+        matpower_conv_data["basekVac"] = dc_voltage  # Default value: basekvAC = dc_voltage
+
+        rtf_ohm = pu_to_base(0.01, "Ohm", conv_rating, ac_voltage)  # Default value: rtf = 0.01 * ac_voltage^2 / conv_rating
+        matpower_conv_data["rtf"] = base_to_pu(rtf_ohm, "Ohm", base_mva, ac_voltage)
+        matpower_conv_data["xtf"] = matpower_conv_data["rtf"] * 10  # Default value: xtf = rtf * 10
+
+        rc_ohm = pu_to_base(0.01, "Ohm", conv_rating, dc_voltage)  # Default value: rc = 0.01 * dc_voltage^2 / conv_rating
+        matpower_conv_data["rc"] = base_to_pu(rc_ohm, "Ohm", base_mva, dc_voltage)
+        matpower_conv_data["xc"] = matpower_conv_data["rc"] * 10  # Default value: xc = rc * 10
+        matpower_conv_data["ground_z"] = matpower_conv_data["rc"] * 50  # Default value: ground_z = rc * 50
 
         matpower_data["convdc"][conv_id] = matpower_conv_data
     end
@@ -360,7 +388,6 @@ function build_grid_model(work_dir::String, base_mva::Int)
             end
             matpower_ndgen_data["gen_bus"] = model_gen_data["bus id"]
             matpower_ndgen_data["pref"] = model_gen_data["power rating"]
-            matpower_ndgen_data["cost_gen"] = cost_production
             matpower_ndgen_data["cost_curt"] = cost_curtailment
             matpower_data["ndgen"][gen_id] = matpower_ndgen_data
         end

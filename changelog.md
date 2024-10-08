@@ -9,6 +9,13 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2024-10-08
+### Changed
+- Template model.xlsx: removal of 'connection type'
+- Template default_values.xlsx: update comments and values (some default values are now default models)
+### Fixed
+- Resistance pu conversion in DC
+
 ## [add_tests] - 2024-10-03
 ### Changed
 - RES generators (ndgen) are the ones with generation_cost = 0
