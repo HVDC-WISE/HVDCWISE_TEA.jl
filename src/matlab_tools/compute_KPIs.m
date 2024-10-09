@@ -97,17 +97,27 @@ for scenario_id=1:length(folders)
         SEW=0;
 
         % Dispatchable generators
-        for gen = 1:min(size(pg_gen,1), number_of_dispatchable_gen)
-            pg_gen(isnan(pg_gen(:,gen)),gen)=0;
-            SEW = SEW + sum(pg_gen(validTimesteps,gen).*(maxPrice-mpc.gencost(gen,5)));
+        for k_gen = 1:min(size(pg_gen,2), number_of_dispatchable_gen)
+            pg_gen(isnan(pg_gen(:,k_gen)),k_gen)=0;
+            SEW = SEW + sum(pg_gen(validTimesteps,k_gen).*(maxPrice-mpc.gencost(k_gen,5)));
         endfor
 
         % Non-dispatchable generators
-        for ndgen = number_of_dispatchable_gen+1:size(pg_gen,2)
-            pg_gen(isnan(pg_gen(:,ndgen)),ndgen)=0;
-            SEW = SEW + sum(pg_gen(validTimesteps,ndgen).*(maxPrice-mpc.ndgen(ndgen-number_of_dispatchable_gen,6)));
-            # SEW = SEW - sum(pg_curt(validTimesteps,ndgen).*mpc.ndgen(ndgen-number_of_dispatchable_gen,7));
-        endfor
+        if isfield(mpc, 'ndgen')
+            for k_ndgen = number_of_dispatchable_gen+1:size(pg_gen,2)
+                pg_gen(isnan(pg_gen(:,k_ndgen)),k_ndgen)=0;
+                SEW = SEW + sum(pg_gen(validTimesteps,k_ndgen).*(maxPrice-mpc.ndgen(k_ndgen-number_of_dispatchable_gen,6)));
+                # SEW = SEW - sum(pg_curt(validTimesteps,k_ndgen).*mpc.ndgen(k_ndgen-number_of_dispatchable_gen,7));
+            endfor
+        endif
+
+        % Storages
+        if isfield(mpc, 'storage')
+            for k = 1:size(ps_storage,2)
+                ps_storage(isnan(ps_storage(:,k)),k)=0;
+                SEW = SEW - sum(ps_storage(validTimesteps,k).*maxPrice);
+            endfor
+        endif
 
         SEW = SEW * 8760 / length(validTimesteps); % extrapolation for 1-year time horizon
 

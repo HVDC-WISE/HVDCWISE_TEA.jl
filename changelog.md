@@ -9,6 +9,10 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2024-10-09
+### Changed
+- Storage considered in SEW computation
+
 ## [add_tests] - 2024-10-08
 ### Changed
 - Template model.xlsx: removal of 'connection type'
