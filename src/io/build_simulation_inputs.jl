@@ -401,8 +401,8 @@ function build_grid_model(work_dir::String, base_mva::Int)
         matpower_data["bus"][bus_id]["Pd"] = model_load_data["power rating"]
         load_type = model_load_data["type"]
         costs_load_data = costs_data["load"][load_type]
-        if Set([model_load_data["max power shift up"], model_load_data["max power shift down"], model_load_data["max voluntary reduced power"]]) != Set([0])  # Flexible load
-            matpower_load_extra_data = Dict()
+
+        matpower_load_extra_data = Dict()
             for attribute in keys(default_data["load_extra"])
                 matpower_load_extra_data[attribute] = default_data["load_extra"][attribute]["value"]
             end
@@ -413,8 +413,13 @@ function build_grid_model(work_dir::String, base_mva::Int)
             matpower_load_extra_data["cost_shift"] = costs_load_data["shifting cost"]
             matpower_load_extra_data["cost_red"] = costs_load_data["reduction cost"]
             matpower_load_extra_data["cost_curt"] = costs_load_data["curtailment cost"]
-            matpower_data["load_extra"][load_id] = matpower_load_extra_data
+
+        if Set([model_load_data["max power shift up"], model_load_data["max power shift down"], model_load_data["max voluntary reduced power"]]) != Set([0])  # Flexible load
+            matpower_load_extra_data["flex"] = 1
+        else
+            matpower_load_extra_data["flex"] = 0
         end
+        matpower_data["load_extra"][load_id] = matpower_load_extra_data
     end
 
     # storage, storage_extra

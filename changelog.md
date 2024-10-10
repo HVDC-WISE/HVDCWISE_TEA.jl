@@ -9,6 +9,10 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2024-10-10
+### Changed
+- Several economic indicators instead of SEW: Generation_cost, RES_curtailment_cost, Load_shedding_cost, Producers_surplus, Consumers_surplus
+
 ## [add_tests] - 2024-10-09
 ### Changed
 - Storage considered in SEW computation
