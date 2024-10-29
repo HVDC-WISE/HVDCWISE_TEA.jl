@@ -104,6 +104,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
         "branchdc" => ["from bus id",  "to bus id", "type", "configuration", "power rating", "resistance"], 
         "convdc" => ["AC bus id",  "DC bus id", "type", "configuration", "power rating"],
         "gen" => ["bus id", "type", "power rating"], 
+        "gen_res" => ["bus id", "type", "power rating"], 
         "load" => ["bus id", "type", "power rating", "max power shift up", "max power shift down", "max voluntary reduced power"], 
         "storage" => ["bus id", "type", "production rating", "consumption rating", "initial energy", "energy rating", "production efficiency", "consumption efficiency", "self discharge rate"])
     model_units = Dict(comp_name => Dict() for comp_name in keys(model_attributes))
@@ -142,7 +143,8 @@ function build_grid_model(work_dir::String, base_mva::Int)
     
     costs_attributes = Dict(
         "load" => ["curtailment cost", "reduction cost", "shifting cost"], 
-        "gen" => ["production cost", "curtailment cost", "CO2 emission"])
+        "gen" => ["production cost", "CO2 emission"],
+        "gen_res" => ["curtailment cost"])
     costs_units = Dict(comp_name => Dict() for comp_name in keys(costs_attributes))
     costs_data = Dict(comp_name => Dict() for comp_name in keys(costs_attributes))
 
@@ -356,42 +358,51 @@ function build_grid_model(work_dir::String, base_mva::Int)
         matpower_data["convdc"][conv_id] = matpower_conv_data
     end
 
-    # gen, gencost, ndgen, emission factors
+    # gen, gencost, emission factors
+    emission_factors = Dict()  # Emission factor per gen id
     for gen_id in keys(model_data["gen"])
         model_gen_data = model_data["gen"][gen_id]
+        matpower_gen_data = Dict()
+        for attribute in keys(default_data["gen"])
+            matpower_gen_data[attribute] = default_data["gen"][attribute]["value"]
+        end
+        matpower_gen_data["bus"] = model_gen_data["bus id"]
+        matpower_gen_data["Pmax"] = model_gen_data["power rating"]
+        matpower_data["gen"][gen_id] = matpower_gen_data
+
+        matpower_gencost_data = Dict()
+        for attribute in keys(default_data["gencost"])
+            matpower_gencost_data[attribute] = default_data["gencost"][attribute]["value"]
+        end
         gen_type = model_gen_data["type"]
+        @assert gen_type in keys(costs_data["gen"])  "$gen_type (gen id $gen_id) is not defined in the gen cost data"
         costs_gen_data = costs_data["gen"][gen_type]
         cost_production = costs_gen_data["production cost"]
-        cost_curtailment = costs_gen_data["curtailment cost"]
-        if cost_production > 0  # Dispatchable generator
-            @assert cost_curtailment == 0  "Generator type $gen_type is dispatchable (production cost = $cost_production > 0). Its curtailment cost should be 0, not $cost_curtailment"
-            matpower_gen_data = Dict()
-            for attribute in keys(default_data["gen"])
-                matpower_gen_data[attribute] = default_data["gen"][attribute]["value"]
-            end
-            matpower_gen_data["bus"] = model_gen_data["bus id"]
-            matpower_gen_data["Pmax"] = model_gen_data["power rating"]
-            matpower_data["gen"][gen_id] = matpower_gen_data
+        @assert cost_production >= 0  "Generator type $gen_type has a production cost < 0, which is not possible: $cost_production"
+        matpower_gencost_data["c(1)"] = cost_production
+        matpower_data["gencost"][gen_id] = matpower_gencost_data
 
-            matpower_gencost_data = Dict()
-            for attribute in keys(default_data["gencost"])
-                matpower_gencost_data[attribute] = default_data["gencost"][attribute]["value"]
-            end
-            matpower_gencost_data["c(1)"] = cost_production
-            matpower_data["gencost"][gen_id] = matpower_gencost_data
-        else  # Non dispatchable generator
-            @assert cost_production == 0  "Generator type $gen_type has a production cost < 0, which is not possible: $cost_production"
-            @assert cost_curtailment >= 0  "Generator type $gen_type has a curtailment cost < 0, which is not possible: $cost_curtailment"
-            matpower_ndgen_data = Dict()
-            for attribute in keys(default_data["ndgen"])
-                matpower_ndgen_data[attribute] = default_data["ndgen"][attribute]["value"]
-            end
-            matpower_ndgen_data["gen_bus"] = model_gen_data["bus id"]
-            matpower_ndgen_data["pref"] = model_gen_data["power rating"]
-            matpower_ndgen_data["cost_curt"] = cost_curtailment
-            matpower_data["ndgen"][gen_id] = matpower_ndgen_data
+        emission_factors[gen_id] = Dict("CO2" => costs_gen_data["CO2 emission"])  # Other types of emissions (NOx, SO2, COV, particles, ...) could be added
+    end
+    matpower_data["emission_factors"] = emission_factors
+
+    # ndgen
+    for ndgen_id in keys(model_data["gen_res"])
+        model_ndgen_data = model_data["gen_res"][ndgen_id]
+        ndgen_type = model_ndgen_data["type"]
+        @assert ndgen_type in keys(costs_data["gen_res"])  "$ndgen_type (gen_res id $ndgen_id) is not defined in the gen_res cost data"
+        costs_ndgen_data = costs_data["gen_res"][ndgen_type]
+        cost_curtailment = costs_ndgen_data["curtailment cost"]
+
+        @assert cost_curtailment >= 0  "Generator type $gen_type has a curtailment cost < 0, which is not possible: $cost_curtailment"
+        matpower_ndgen_data = Dict()
+        for attribute in keys(default_data["ndgen"])
+            matpower_ndgen_data[attribute] = default_data["ndgen"][attribute]["value"]
         end
-        matpower_data["emission_factors"][gen_id] = Dict("CO2" => costs_gen_data["CO2 emission"])  # Other types of emissions (NOx, SO2, COV, particles, ...) could be added
+        matpower_ndgen_data["gen_bus"] = model_ndgen_data["bus id"]
+        matpower_ndgen_data["pref"] = model_ndgen_data["power rating"]
+        matpower_ndgen_data["cost_curt"] = cost_curtailment
+        matpower_data["ndgen"][ndgen_id] = matpower_ndgen_data
     end
 
     # load (bus), load_extra
@@ -468,7 +479,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
         write(f, "%% MATPOWER Case Format : Version 2\nmpc.version = '2';\n\n")
         write(f, "%% system MVA base\nmpc.baseMVA = $base_mva;\n\n")
         write(f, "mpc.time_elapsed = 1.0;\n")
-        for matrix_name in keys(matpower_data)
+        for matrix_name in sort([name for name in keys(matpower_data)])
             if length(matpower_data[matrix_name]) > 0
                 sorted_ids = sort([id for id in keys(matpower_data[matrix_name])])
                 attributes = sorted_default_attributes[matrix_name]
@@ -495,7 +506,9 @@ end
 function build_csv(micro_scenario_dir::String, sheet::XLSX.Worksheet, readme_data::Dict, model_data, base_mva)
     @assert occursin("|", sheet.name) "Not expected sheet name $(sheet.name)"
     (comp_name, attribute) = split(sheet.name, "|")
-    mkpath(joinpath(micro_scenario_dir, comp_name))  # Create the folder (and its parents) if it does not exist yet
+    if comp_name != "gen_res"
+        mkpath(joinpath(micro_scenario_dir, comp_name))  # Create the folder (and its parents) if it does not exist yet
+    end
     micro_scenario = basename(micro_scenario_dir)
     n_comp = readme_data["Nb of components"]
     n_hours = readme_data["Nb of hours"]
@@ -517,9 +530,7 @@ function build_csv(micro_scenario_dir::String, sheet::XLSX.Worksheet, readme_dat
         attribute = "stationary_energy_$attribute"
     end
 
-    # Create CSV
-    csv_path = joinpath(micro_scenario_dir, comp_name, "$attribute.csv")
-    # series_data = DataFrames.DataFrame(Dict("$id"=>[] for id in 1:n_comp))
+    # Builds data for the CSV
     series_data = DataFrames.DataFrame()
 
     for id in 1:n_comp
@@ -542,7 +553,21 @@ function build_csv(micro_scenario_dir::String, sheet::XLSX.Worksheet, readme_dat
         end
         series_data[!,"$id"] = [sheet[i,id+1]*unit_conversion for i in 2:n_hours+1]
     end
-    CSV.write(csv_path, series_data, writeheader=true)
+    
+    # Create CSV
+    if comp_name == "gen_res"
+        csv_path = joinpath(micro_scenario_dir, "gen", "$attribute.csv")
+        gen_series = CSV.File(csv_path, delim=',') |> DataFrames.DataFrame
+        n_gen = size(gen_series, 2)
+        n_ndgen = size(series_data, 2)
+        for ndgen_id=1:n_ndgen
+            gen_series[!, "$(n_gen+ndgen_id)"] = series_data[!, "$ndgen_id"]
+        end
+        CSV.write(csv_path, gen_series, writeheader=true)
+    else
+        csv_path = joinpath(micro_scenario_dir, comp_name, "$attribute.csv")
+        CSV.write(csv_path, series_data, writeheader=true)
+    end
     return Dict("micro-scenario" => micro_scenario, "comp_name" => comp_name, "attribute" => attribute, "n_comp" => n_comp, "n_hours" => n_hours)
 end
 
@@ -572,11 +597,11 @@ function build_power_series(work_dir::String, base_mva::Int, model_data::Dict)
         @assert "ReadMe" in sheet_names  "file $series_path should have a sheet 'ReadMe'"
         readme_sheet = series_file["ReadMe"]
         @assert [readme_sheet[7,j] for j in 1:4] == ["Attribute", "Nb of components", "Nb of hours", "Unit"]  "ReadMe sheet A7:D7 should be [Attribute, Nb of components, Nb of hours, Unit] while it is $(readme_sheet[7,1:4])"
-        @assert [readme_sheet[i,1] for i in 8:11] == ["load|pd", "gen|pmax", "storage|inflow", "storage|outflow"]  "ReadMe sheet A8:A11 should be [load|pd, gen|pmax, storage|inflow, storage|outflow] while it is $(readme_sheet[8:11,1])"
+        @assert [readme_sheet[i,1] for i in 8:12] == ["load|pd", "gen|pmax", "gen_res|pmax", "storage|inflow", "storage|outflow"]  "ReadMe sheet A8:A12 should be [load|pd, gen|pmax, gen_res|pmax, storage|inflow, storage|outflow] while it is $(readme_sheet[8:12,1])"
         
         # Build 1 csv per component attribute with time series
         @assert all([readme_sheet[i,2] > 0 for i in 8:9])  "Some time series should be provided both for load|pd and gen|Pmax in micro-scenario $micro_scenario. Check sheet ReadMe in $series_path."
-        for i in 8:11
+        for i in 8:12
             if readme_sheet[i,2] > 0
                 sheet_name = readme_sheet[i,1]
                 sheet = series_file[sheet_name]

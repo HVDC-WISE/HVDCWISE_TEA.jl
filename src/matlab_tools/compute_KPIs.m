@@ -126,7 +126,6 @@ for scenario_id=1:length(folders)
         cost_curtailment_load = 0;  % Cost (€) of load shedding
         cost_flexibility = 0;  % Cost (€) of load shifting & load voluntary reduction
         welfare_producers = 0;  % Benefits/Surplus (€) for producers (production * (market price - generation cost)) & storages ((production - consumption) * market price)
-        % consumption_value = 0;  % Value (€) of the consumption (consumption * curtailment cost)
         welfare_consumers = 0;  % Benefits/Surplus (€) for consumers (consumption * (curtailment cost - market price))
 
         % Dispatchable generators
@@ -189,7 +188,7 @@ for scenario_id=1:length(folders)
 
         %% --- CO2 emissions ---
         CO2=0;
-        for k=1:size(pg_gen,2)
+        for k=1:number_of_dispatchable_gen  % Use k=1:size(pg_gen,2) to consider also ndgen emissions
             pg_gen(isnan(pg_gen(:,k)),k)=0;  % MW, vector(time)
             CO2=CO2+sum(pg_gen(validTimesteps,k).*mpc.emission_factors(k,1));  % tCO2
         endfor

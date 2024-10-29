@@ -9,6 +9,14 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2024-10-29
+### Added
+- Sheet 'gen_res' in the user inputs (model, cost, series)
+### Changed
+- Matrices sorted by alphabetic order in the .m file
+### Fixed
+- Emission factors matrix (gen ids ordering different from the user inputs ones)
+
 ## [add_tests] - 2024-10-10
 ### Changed
 - Several economic indicators instead of SEW: Generation_cost, RES_curtailment_cost, Load_shedding_cost, Producers_surplus, Consumers_surplus

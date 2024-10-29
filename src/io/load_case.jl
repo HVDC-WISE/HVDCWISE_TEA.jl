@@ -26,7 +26,7 @@ end
 
 function load_case(input_dir::String, work_dir::String, case_name::String, base_mva::Int=100, save_results::Bool=false)
 
-    ## Buil .m & .csv files
+    ## Build .m & .csv files
     build_raw_inputs(input_dir, work_dir, case_name, base_mva)
 
     ## Define the path of the .m file
