@@ -58,6 +58,8 @@ include("io/parse.jl")
 include("io/scenario.jl")
 include("io/run_study.jl")
 
+include("matlab_tools/run_matlab.jl")
+
 include("parallel/base.jl")
 
 include("prob/opf_mc_acdc.jl")

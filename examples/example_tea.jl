@@ -37,7 +37,7 @@ hours_per_subsimulation = 168  # The yearly problem is split into subproblems of
 # path2grid = joinpath(_HWTEA_dir, "test/data", "grids/adcdc", "case39_mcdc.m")
 # path2data = joinpath(_HWTEA_dir, "test/data", "timeseries", "example_mc")
 # work_dir = joinpath(_HWTEA_dir, "studies\\simple_use_case")
-work_dir = joinpath(_HWTEA_dir, "studies\\UC3\\v0")
+work_dir = joinpath(_HWTEA_dir, "studies\\UC3\\v1")
 
 ## Solve the multiperiod OPF problem
 

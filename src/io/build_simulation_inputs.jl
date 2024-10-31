@@ -3,13 +3,13 @@ using CSV
 import DataFrames
 using XLSX
 
-function build_simulation_inputs(work_dir::String, base_mva::Int=100)
+function build_simulation_inputs(work_dir::String, base_mva::Int, matlab_octave_path::String)
     model_data = build_grid_model(work_dir, base_mva)
     power_series_info = build_power_series(work_dir, base_mva, model_data)
     n_power_series = power_series_info["n_series"]  # Not used
     n_hours = power_series_info["n_hours"]
 
-    build_availability_series(work_dir, n_hours)
+    build_availability_series(work_dir, n_hours, matlab_octave_path::String)
 end
 
 function base_to_pu(value::Float64, unit::String, base_mva::Int, base_kv::Int)
@@ -619,7 +619,7 @@ function build_power_series(work_dir::String, base_mva::Int, model_data::Dict)
     return Dict("n_series" => length(micro_scenarios), "n_hours" => n_hours)
 end
 
-function build_availability_series(work_dir::String, n_hours::Int)
+function build_availability_series(work_dir::String, n_hours::Int, matlab_octave_path::String)
     reliability_path = joinpath(work_dir, "user_interface", "inputs", "reliability_data.xlsx")
     @assert isfile(reliability_path)  "$reliability_inputs_path is not a file"
     reliability_file = XLSX.readxlsx(reliability_path)
@@ -637,9 +637,10 @@ function build_availability_series(work_dir::String, n_hours::Int)
 
     # TODO build reliability_data.csv in matlab_tool_path from reliability_data.xlsx in work
 
-    println("Run build_availability_series.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
-    a = readline();  # TODO automatically run src/matlab_tools/build_availability_series.m or recode it in Julia
+    # println("Run build_availability_series.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
+    # a = readline();  # TODO automatically run src/matlab_tools/build_availability_series.m or recode it in Julia
     println("Building availability series")
+    run_matlab_script(joinpath(matlab_tool_path, "build_availability_series.m"), matlab_octave_path)
 
     availability_series_dir = joinpath(matlab_tool_path, "availability_series")
     for microscenario in  readdir(availability_series_dir)

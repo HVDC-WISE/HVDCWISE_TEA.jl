@@ -1,6 +1,7 @@
 clear
 clc
 
+addpath(fileparts(mfilename('fullpath')));
 pkg load io
 
 MWh_to_TWh = 10^-6;
@@ -171,8 +172,8 @@ for scenario_id=1:length(folders)
                 cost_red = mpc.load_extra(load_extra_id, 11);  % €/MWh
                 cost_flexibility = cost_flexibility + sum(pred(validTimesteps,k).*cost_red) + sum(pshift_up(validTimesteps,k).*cost_shift);  % €.   % Shifted down and shifted up energy are supposed to be equal
             endif
-            curtailed_power = p_slack(validTimesteps,bus_id)  % MW, vector(time)
-            consumed_power = pflex(validTimesteps,k) - curtailed_power + pshift_up(validTimesteps,k) - pshift_down(validTimesteps,k)  % MW, vector(time)
+            curtailed_power = p_slack(validTimesteps,bus_id);  % MW, vector(time)
+            consumed_power = pflex(validTimesteps,k) - curtailed_power + pshift_up(validTimesteps,k) - pshift_down(validTimesteps,k);  % MW, vector(time)
             cost_curtailment_load = cost_curtailment_load + sum(curtailed_power.*cost_curt);  % €
             welfare_consumers = welfare_consumers + sum(consumed_power.*(cost_curt - maxPrice));  % €
         endfor

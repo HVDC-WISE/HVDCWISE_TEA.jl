@@ -4,7 +4,7 @@ import JSON
 import XLSX
 
 
-function build_user_results(work_dir::String, base_mva::Int)
+function build_user_results(work_dir::String, base_mva::Int, matlab_octave_path::String)
     # Identify simulation results directory
     simulation_dir = joinpath(work_dir, "simulation_interface")
     macro_scenario = ""
@@ -32,9 +32,10 @@ function build_user_results(work_dir::String, base_mva::Int)
     totex = totex_summary(opex, capex)
 
     # Build user results (Matlab code)
-    println("Run compute_KPIs.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
-    a = readline();  # TODO automatically run src/matlab_tools/compute_KPIs.m or recode it in Julia
+    # println("Run compute_KPIs.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
+    # a = readline();  # TODO automatically run src/matlab_tools/compute_KPIs.m or recode it in Julia
     println("Computing KPIs")
+    run_matlab_script(joinpath(matlab_tool_path, "compute_KPIs.m"), matlab_octave_path)
 
     # Delete study files in the matlab tool folder
     rm(joinpath(matlab_tool_path, "grid_model.m"))

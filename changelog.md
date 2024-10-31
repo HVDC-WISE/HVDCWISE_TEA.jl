@@ -9,6 +9,10 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2024-10-31
+### Changed
+- Automatised running of the Matlab scripts
+
 ## [add_tests] - 2024-10-29
 ### Added
 - Sheet 'gen_res' in the user inputs (model, cost, series)
