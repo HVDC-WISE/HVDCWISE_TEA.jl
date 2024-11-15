@@ -1,14 +1,11 @@
 
 
 
-function run_study(work_dir::String, hours::Int, base_mva::Int, optimizer, setting)
+function run_study(work_dir::String, hours::Int, base_mva::Int, optimizer, setting, matlab_octave_path::String)
     simulation_dir = joinpath(work_dir, "simulation_interface")
     if isdir(simulation_dir)
         rm(simulation_dir, recursive=true)
     end
-
-    matlab_octave_path = detect_matlab_or_octave()
-    # matlab_octave_path = "C:/Users/n.barla/AppData/Local/Programs/GNU Octave/Octave-9.2.0/octave-launch.exe"
 
     println("Build simulation inputs")
     build_simulation_inputs(work_dir, base_mva, matlab_octave_path)

@@ -63,7 +63,7 @@ function reliability_data = read_reliability_data()
     type_of_unavailabilities = 0; % 0 = only N-1, 1 = only N-k, 2 = both
 
     %%%%%%%% adding data about type of DC branch (1 = overhead, 0 = cable)
-    mpc.branchdc(:,17) = 1; %
+    mpc.branchdc(:,17) = 0; %
     % adding percentage of cable type over the total length (not used in the % release)
     mpc.branchdc(:,18) = 0.1; % pu of cable;
 

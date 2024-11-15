@@ -1,6 +1,6 @@
 name = "HVDCWISE_TEA"
 uuid = "7b29a82c-0483-4e57-865f-ac81b04b6a14"
-authors = ["Matteo Baù", "Matteo Rossini"]
+authors = ["Matteo Baù", "Matteo Rossini", "Nicolas Barla"]
 version = "1.0.0-DEV"
 
 [deps]

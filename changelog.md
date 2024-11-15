@@ -9,6 +9,13 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2024-11-15
+### Added
+- File main.jl as launching script for the user
+### Fixed
+- Reliability parameters for DC branch are the ones for DC cables (not DC OHL)
+- Matlab/Octave launcher detection
+
 ## [add_tests] - 2024-10-31
 ### Changed
 - Automatised running of the Matlab scripts
