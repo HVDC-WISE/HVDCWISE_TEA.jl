@@ -1,21 +1,44 @@
-function reliability_data = read_reliability_data()
-    addpath(fileparts(mfilename('fullpath')));
+function reliability_data = read_reliability_data(work_dir)
+    % addpath(fileparts(mfilename('fullpath')));
+    pkg load io
+
+    assert(exist('work_dir', 'var') == 1, "work_dir is not defined")
+
+    simulation_dir = [work_dir, '\simulation_interface'];
+    macro_scenario = NaN
+    folders=dir(simulation_dir);
+    folders(1:2)=[];
+    for i=1:length(folders)
+        fifo_name = folders(i).name
+        if fifo_name(end-1:end) == '.m'
+            macro_scenario = fifo_name(1:end-2)
+        endif
+    endfor
+    assert(isnan(macro_scenario) == 0, strcat("No .m file has been found in ", simulation_dir))
 
     %%% --- Main user inputs ---
 
-    mpc = grid_model;  % Matpower file name (to load the grid)
-    output_folder = ['availability_series']
-    disp('output_folder')
-    disp(output_folder)
-    %%% --- Reliability data ---
+    %% load grid model (.m file)
+    addpath(simulation_dir);
+    mpc = feval(macro_scenario);
+    rmpath(simulation_dir);
 
-    [Parameter,Value,Unit,Scope,Meaning] = textread( 'reliability_data.csv', '%s %s %s %s %s' ,'delimiter', ',' );
-    sheet = [Parameter,Value,Unit,Scope,Meaning];
+    % mpc = grid_model;  % Matpower file name (to load the grid)
+    output_folder = [simulation_dir, '\Input_series\Availability'];
+
+    %%% --- Reliability data ---
+    reliability_data_path = [work_dir, '\user_interface\inputs\reliability_data.xlsx'];
+    assert(isfile(reliability_data_path) == 1, strcat(reliability_data_path, " does not exist"))
+
+    [~, ~, sheet] = xlsread(reliability_data_path);
 
     column_titles = {"Parameter", "Value", "Unit", "Scope", "Meaning"};
     for j = 1:5
-    assert(sheet{1,j} == column_titles{j}, strcat("First cell of column ", num2str(j), " should be ", column_titles{j}, ", not ", sheet{1,j}))
+        assert(sheet{1,j} == column_titles{j}, strcat("First cell of column ", num2str(j), " should be ", column_titles{j}, ", not ", sheet{1,j}))
     end
+
+    Parameter = sheet(2:end, 1);
+    Values = cell2mat(sheet(2:end, 2)); % Convert column 1 into a matrix of floats
 
     parameters = {"N",
     "MTTR_genac", % hour
@@ -37,19 +60,13 @@ function reliability_data = read_reliability_data()
     "failurerate_perkm_cabledc",
     };
 
-    values = [];
-    for i = 2:19
-    assert(Parameter{i} == parameters{i-1}, strcat("Parameter in cell A", num2str(i), " should be ", parameters{i-1}, ", not ", Parameter{i}))
-    values = [values, str2num(Value{i})];
-    end
-
-    N = values(1) % Number of time series to be sampled (for N-1 independent unavailabilities)
-    [MTTR_genac, FOR_genac] = deal(num2cell(values(2:3)){:}) % Generator
-    [MTTR_trac, FOR_trac] = deal(num2cell(values(4:5)){:}) % Transformer
-    [MTTR_convdc, FOR_convdc] = deal(num2cell(values(6:7)){:}) % Converter
-    [MTTR_ohlac, MTTR_ohlac_resil, failurerate_fixe_ohlac, failurerate_perkm_ohlac] = deal(num2cell(values(8:11)){:}) % AC lines
-    [MTTRbr_ohldc, MTTRbr_ohldc_resil, failurerate_fixe_ohldc, failurerate_perkm_ohldc] = deal(num2cell(values(12:15)){:}) % DC OHL
-    [MTTR_cabledc, MTTR_cabledc_resil, failurerate_perkm_cabledc] = deal(num2cell(values(16:18)){:}) % DC cable
+    n_series = Values(1); % Number of time series to be sampled (for N-1 independent unavailabilities)
+    [MTTR_genac, FOR_genac] = deal(num2cell(Values(2:3)){:}); % Generator
+    [MTTR_trac, FOR_trac] = deal(num2cell(Values(4:5)){:}); % Transformer
+    [MTTR_convdc, FOR_convdc] = deal(num2cell(Values(6:7)){:}); % Converter
+    [MTTR_ohlac, MTTR_ohlac_resil, failurerate_fixe_ohlac, failurerate_perkm_ohlac] = deal(num2cell(Values(8:11)){:}); % AC lines
+    [MTTRbr_ohldc, MTTRbr_ohldc_resil, failurerate_fixe_ohldc, failurerate_perkm_ohldc] = deal(num2cell(Values(12:15)){:}); % DC OHL
+    [MTTR_cabledc, MTTR_cabledc_resil, failurerate_perkm_cabledc] = deal(num2cell(Values(16:18)){:}); % DC cable
 
     % Correlation between pole failures
     corr_dcpoles_adequacy = 0.5; % correlation among the wires (P, N and R) of DC branches for adequacy assessment analyses on N-1 ctgs
@@ -59,8 +76,6 @@ function reliability_data = read_reliability_data()
     %%% --- Other hypotheses ---
 
     warning off
-
-    type_of_unavailabilities = 0; % 0 = only N-1, 1 = only N-k, 2 = both
 
     %%%%%%%% adding data about type of DC branch (1 = overhead, 0 = cable)
     mpc.branchdc(:,17) = 0; %
@@ -136,7 +151,7 @@ function reliability_data = read_reliability_data()
     MTTRbrs_dc_resil(find(mpc.branchdc(idexdc,17)==0)) = ones(1,length(find(mpc.branchdc(idexdc,17)==0)))*MTTR_cabledc_resil;
 
     % Data to return
-    reliability_data.N = N;
+    reliability_data.n_series = n_series;
     reliability_data.mpc = mpc;
     # reliability_data.mpc0 = mpc0;
     reliability_data.output_folder = output_folder;

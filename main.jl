@@ -1,9 +1,6 @@
 using Distributed
 using HVDCWISE_TEA
-import PowerModels as _PM
 import HiGHS
-import Ipopt
-using XLSX
 
 ## Workers setup
 nprocs() > 1 && rmprocs(workers())

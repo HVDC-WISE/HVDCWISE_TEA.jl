@@ -1,20 +1,31 @@
-% script for the generation of unavailabilities seriesfor N-1 and N-k
-% outages including HVDC assets
-clear all
+% script for the generation of unavailabilities seriesfor N-1 outages including HVDC assets
 clc
 close all
+if length(who) > 2
+    clear(setdiff(who, {'n_hours', 'work_dir'}){:});  % clear all variables except work_dir and n_hours
+endif
+
 format long
 
 addpath(fileparts(mfilename('fullpath')));
 
 %%% Retrieve input data
+assert(exist('work_dir', 'var') == 1, "work_dir is not defined")
+assert(exist('n_hours', 'var') == 1, "n_hours is not defined")
+if ~isnumeric(n_hours)
+    n_hours = str2num(n_hours);
+endif
 
 # read_reliability_data;
-reliability_data = read_reliability_data;
+reliability_data = read_reliability_data(work_dir);
 
 mpc = reliability_data.mpc;
-N = reliability_data.N;
+n_series = reliability_data.n_series;
+
 folderout = reliability_data.output_folder;
+if isfolder(folderout)
+    rmdir(folderout, 's');  % 's' to also delete all subfolders and files
+endif
 mkdir(folderout);
 
 MTTRsgen_ac = reliability_data.MTTRsgen_ac;
@@ -38,59 +49,59 @@ poli = reliability_data.poli;
 A=[];BV=[];
 clear Uacline Uacgen  Udcconv_p Udcconv_n
 
-Udcline_r = ones(size(mpc.branchdc,1),8760*N);
-Udcline_p = ones(size(mpc.branchdc,1),8760*N);
-Udcline_n = ones(size(mpc.branchdc,1),8760*N);
-Uacline = ones(size(mpc.branch,1),8760*N);
-Uacgen = ones(size(mpc.gen,1),8760*N);
-Udcconv_p = ones(size(mpc.convdc,1),8760*N);
-Udcconv_n = ones(size(mpc.convdc,1),8760*N);
+Udcline_r = ones(size(mpc.branchdc,1),n_hours*n_series);
+Udcline_p = ones(size(mpc.branchdc,1),n_hours*n_series);
+Udcline_n = ones(size(mpc.branchdc,1),n_hours*n_series);
+Uacline = ones(size(mpc.branch,1),n_hours*n_series);
+Uacgen = ones(size(mpc.gen,1),n_hours*n_series);
+Udcconv_p = ones(size(mpc.convdc,1),n_hours*n_series);
+Udcconv_n = ones(size(mpc.convdc,1),n_hours*n_series);
 
 % AC  branches
 for ibr = 1:size(mpc.branch,1)
     iyr=1;dt=1;in=1;
-    while in < N
+    while in < n_series
         r=rand;
         if Uacline(ibr,iyr)==1
             dt=ceil(-MTTFbrs_ac(ibr)*log(r));
             t1r = iyr+dt-1;
             t2r = iyr+dt;
             % iyr = t2r;
-            if t2r< 8760*N
+            if t2r< n_hours*n_series
                 Uacline(ibr,iyr:t1r)=1;
                 Uacline(ibr,t2r)=0;
-                in = floor(t2r/8760);
+                in = floor(t2r/n_hours);
                 iyr=t2r;
             else
-                Uacline(ibr,iyr:8760*N)=1;
-                in=N;
+                Uacline(ibr,iyr:n_hours*n_series)=1;
+                in=n_series;
             end
         else
             dt=ceil(-MTTRbrs_ac(ibr)*log(r));
             t1r = iyr+dt-1;
             t2r = iyr+dt;
             % iyr = t2r;
-            if t2r< 8760*N
+            if t2r< n_hours*n_series
                 Uacline(ibr,iyr:t1r)=0;
                 Uacline(ibr,t2r)=1;
-                in =floor(t2r/8760);
+                in =floor(t2r/n_hours);
                 iyr=t2r;
             else
-                Uacline(ibr,iyr:8760*N)=0;
-                in=N;
+                Uacline(ibr,iyr:n_hours*n_series)=0;
+                in=n_series;
             end
         end
     end
 end
-for i = 1:N
-    Uaclines{i} = Uacline(:,1+(i-1)*8760:8760*i);
+for i = 1:n_series
+    Uaclines{i} = Uacline(:,1+(i-1)*n_hours:n_hours*i);
 end
 % DC branches
 for dcbr = 1:size(mpc.branchdc,1)
     quali_poli = poli(find(idexdc==dcbr));
     idxs = find(idexdc==dcbr);
     iyr=1;dt=1;in=1;
-    while in <N
+    while in < n_series
         if DCdependent_adequacy == 1
             r = rand;
             for ipol = 1:length(quali_poli)
@@ -212,70 +223,70 @@ for dcbr = 1:size(mpc.branchdc,1)
                     case 0
                         if trans_tipo(ipol)==0
 
-                            if t2r< 8760*N
+                            if t2r< n_hours*n_series
                                 Udcline_r(dcbr,iyr:t1r)=1;
                                 Udcline_r(dcbr,t2r)=0;
-                                in =floor(t2r/8760);
+                                in =floor(t2r/n_hours);
                                 iyr=t2r;
                             else
-                                Udcline_r(dcbr,iyr:8760*N)=1;
-                                in=N;
+                                Udcline_r(dcbr,iyr:n_hours*n_series)=1;
+                                in=n_series;
                             end
                         else
-                            if t2r< 8760*N
+                            if t2r< n_hours*n_series
                                 Udcline_r(dcbr,iyr:t1r)=0;
                                 Udcline_r(dcbr,t2r)=1;
-                                in =floor(t2r/8760);
+                                in =floor(t2r/n_hours);
                                 iyr=t2r;
                             else
-                                Udcline_r(dcbr,iyr:8760*N)=0;
-                                in=N;
+                                Udcline_r(dcbr,iyr:n_hours*n_series)=0;
+                                in=n_series;
                             end
                         end
                     case 1
                         if trans_tipo(ipol)==0
 
-                            if t2r< 8760*N
+                            if t2r< n_hours*n_series
                                 Udcline_p(dcbr,iyr:t1r)=1;
                                 Udcline_p(dcbr,t2r)=0;
-                                in =floor(t2r/8760);
+                                in =floor(t2r/n_hours);
                                 iyr=t2r;
                             else
-                                Udcline_p(dcbr,iyr:8760*N)=1;
-                                in=N;
+                                Udcline_p(dcbr,iyr:n_hours*n_series)=1;
+                                in=n_series;
                             end
                         else
-                            if t2r< 8760*N
+                            if t2r< n_hours*n_series
                                 Udcline_p(dcbr,iyr:t1r)=0;
                                 Udcline_p(dcbr,t2r)=1;
-                                in =floor(t2r/8760);
+                                in =floor(t2r/n_hours);
                                 iyr=t2r;
                             else
-                                Udcline_p(dcbr,iyr:8760*N)=0;
-                                in=N;
+                                Udcline_p(dcbr,iyr:n_hours*n_series)=0;
+                                in=n_series;
                             end
                         end
                     case 2
                         if trans_tipo(ipol)==0
 
-                            if t2r< 8760*N
+                            if t2r< n_hours*n_series
                                 Udcline_n(dcbr,iyr:t1r)=1;
                                 Udcline_n(dcbr,t2r)=0;
-                                in =floor(t2r/8760);
+                                in =floor(t2r/n_hours);
                                 iyr=t2r;
                             else
-                                Udcline_n(dcbr,iyr:8760*N)=1;
-                                in=N;
+                                Udcline_n(dcbr,iyr:n_hours*n_series)=1;
+                                in=n_series;
                             end
                         else
-                            if t2r< 8760*N
+                            if t2r< n_hours*n_series
                                 Udcline_n(dcbr,iyr:t1r)=0;
                                 Udcline_n(dcbr,t2r)=1;
-                                in =floor(t2r/8760);
+                                in =floor(t2r/n_hours);
                                 iyr=t2r;
                             else
-                                Udcline_n(dcbr,iyr:8760*N)=0;
-                                in=N;
+                                Udcline_n(dcbr,iyr:n_hours*n_series)=0;
+                                in=n_series;
                             end
                         end
                 end
@@ -330,68 +341,68 @@ for dcbr = 1:size(mpc.branchdc,1)
                 case 0
                     if trans_tipo(ipol)==0
 
-                        if t2r< 8760*N
+                        if t2r< n_hours*n_series
                             Udcline_r(dcbr,iyr:t1r)=1;
                             Udcline_r(dcbr,t2r)=0;
-                            in =floor(t2r/8760);
+                            in =floor(t2r/n_hours);
                             iyr=t2r;
                         else
-                            Udcline_r(dcbr,iyr:8760*N)=1;
-                            in=N;
+                            Udcline_r(dcbr,iyr:n_hours*n_series)=1;
+                            in=n_series;
                         end
                     else
-                        if t2r< 8760*N
+                        if t2r< n_hours*n_series
                             Udcline_r(dcbr,iyr:t1r)=0;
                             Udcline_r(dcbr,t2r)=1;
-                            in =floor(t2r/8760);
+                            in =floor(t2r/n_hours);
                             iyr=t2r;
                         else
-                            Udcline_r(dcbr,iyr:8760*N)=0;
-                            in=N;
+                            Udcline_r(dcbr,iyr:n_hours*n_series)=0;
+                            in=n_series;
                         end
                     end
                 case 1
                     if trans_tipo(ipol)==0
-                        if t2r< 8760*N
+                        if t2r< n_hours*n_series
                             Udcline_p(dcbr,iyr:t1r)=1;
                             Udcline_p(dcbr,t2r)=0;
-                            in =floor(t2r/8760);
+                            in =floor(t2r/n_hours);
                             iyr=t2r;
                         else
-                            Udcline_p(dcbr,iyr:8760*N)=1;
-                            in=N;
+                            Udcline_p(dcbr,iyr:n_hours*n_series)=1;
+                            in=n_series;
                         end
                     else
-                        if t2r< 8760*N
+                        if t2r< n_hours*n_series
                             Udcline_p(dcbr,iyr:t1r)=0;
                             Udcline_p(dcbr,t2r)=1;
-                            in =floor(t2r/8760);
+                            in =floor(t2r/n_hours);
                             iyr=t2r;
                         else
-                            Udcline_p(dcbr,iyr:8760*N)=0;
-                            in=N;
+                            Udcline_p(dcbr,iyr:n_hours*n_series)=0;
+                            in=n_series;
                         end
                     end
                 case 2
                     if trans_tipo(ipol)==0
-                        if t2r< 8760*N
+                        if t2r< n_hours*n_series
                             Udcline_n(dcbr,iyr:t1r)=1;
                             Udcline_n(dcbr,t2r)=0;
-                            in =floor(t2r/8760);
+                            in =floor(t2r/n_hours);
                             iyr=t2r;
                         else
-                            Udcline_n(dcbr,iyr:8760*N)=1;
-                            in=N;
+                            Udcline_n(dcbr,iyr:n_hours*n_series)=1;
+                            in=n_series;
                         end
                     else
-                        if t2r< 8760*N
+                        if t2r< n_hours*n_series
                             Udcline_n(dcbr,iyr:t1r)=0;
                             Udcline_n(dcbr,t2r)=1;
-                            in =floor(t2r/8760);
+                            in =floor(t2r/n_hours);
                             iyr=t2r;
                         else
-                            Udcline_n(dcbr,iyr:8760*N)=0;
-                            in=N;
+                            Udcline_n(dcbr,iyr:n_hours*n_series)=0;
+                            in=n_series;
                         end
                     end
             end
@@ -400,80 +411,80 @@ for dcbr = 1:size(mpc.branchdc,1)
     end
 end
 
-for i = 1:N
-    Udclines_n{i} = Udcline_n(:,1+(i-1)*8760:8760*i);
-    Udclines_r{i} = Udcline_r(:,1+(i-1)*8760:8760*i);
-    Udclines_p{i} = Udcline_p(:,1+(i-1)*8760:8760*i);
+for i = 1:n_series
+    Udclines_n{i} = Udcline_n(:,1+(i-1)*n_hours:n_hours*i);
+    Udclines_r{i} = Udcline_r(:,1+(i-1)*n_hours:n_hours*i);
+    Udclines_p{i} = Udcline_p(:,1+(i-1)*n_hours:n_hours*i);
 end
 % AC Gens
 for ibr = 1:size(mpc.gen,1)
     iyr=1;dt=1;in=1;
-    while in < N
+    while in < n_series
         r=rand;
         if Uacgen(ibr,iyr)==1
             dt=ceil(-MTTFsgen_ac(ibr)*log(r));
             t1r = iyr+dt-1;
             t2r = iyr+dt;
-            if t2r< 8760*N
+            if t2r< n_hours*n_series
                 Uacgen(ibr,iyr:t1r)=1;
                 Uacgen(ibr,t2r)=0;
-                in =floor(t2r/8760);
+                in =floor(t2r/n_hours);
                 iyr=t2r;
             else
-                Uacgen(ibr,iyr:8760*N)=1;
-                in=N;
+                Uacgen(ibr,iyr:n_hours*n_series)=1;
+                in=n_series;
             end
         else
             dt = ceil(-MTTRsgen_ac(ibr)*log(r));
             t1r = iyr+dt-1;
             t2r = iyr+dt;
-            if t2r< 8760*N
+            if t2r< n_hours*n_series
                 Uacgen(ibr,iyr:t1r)=0;
                 Uacgen(ibr,t2r)=1;
-                in = floor(t2r/8760);
+                in = floor(t2r/n_hours);
                 iyr = t2r;
             else
-                Uacgen(ibr,iyr:8760*N)=0;
-                in = N;
+                Uacgen(ibr,iyr:n_hours*n_series)=0;
+                in = n_series;
             end
         end
     end
 end
-for i = 1:N
-    Uacgens{i} = Uacgen(:,1+(i-1)*8760:8760*i);
+for i = 1:n_series
+    Uacgens{i} = Uacgen(:,1+(i-1)*n_hours:n_hours*i);
 end
 % DC converters
 if DCdependent_adequacy == 0
     for ibr = 1:size(Udcconv_p,1)
         iyr=1;dt=1;in =1;
-        while in < N
+        while in < n_series
             r = rand;
             if Udcconv_p(ibr,iyr)==1
                 dt=ceil(-MTTFsconv_dc(ibr)*log(r));
                 t1r = iyr+dt-1;
                 t2r = iyr+dt;
 
-                if t2r < 8760*N
+                if t2r < n_hours*n_series
                     Udcconv_p(ibr,iyr:t1r)=1;
                     Udcconv_p(ibr,t2r)=0;
-                    in = floor(t2r/8760);
+                    in = floor(t2r/n_hours);
                     iyr = t2r;
                 else
-                    Udcconv_p(ibr,iyr:8760*N)=1;
-                    in = N;
+                    Udcconv_p(ibr,iyr:n_hours*n_series)=1;
+                    in = n_series;
                 end
             else
                 dt = ceil(-MTTRsconv_dc(ibr)*log(r));
                 t1r = iyr+dt-1;
                 t2r = iyr+dt;
-                if t2r < 8760*N
+                if t2r < n_hours*n_series
                     Udcconv_p(ibr,iyr:t1r)=0;
                     Udcconv_p(ibr,t2r)=1;
-                    in = floor(t2r/8760);
+                    in = floor(t2r/n_hours);
                     iyr = t2r;
                 else
-                    Udcconv_p(ibr,iyr:8760*N) = 0;
-                    in = N;
+                    Udcconv_p(ibr,iyr:n_hours*n_series) = 0;
+                    in = n_series;
                 end
             end
         end
@@ -481,35 +492,35 @@ if DCdependent_adequacy == 0
 
     for ibr = 1:size(Udcconv_n,1)
         iyr=1;dt=1;in =1;
-        while in < N
+        while in < n_series
             r = rand;
             if Udcconv_n(ibr,iyr) == 1
                 dt = ceil(-MTTFsconv_dc(ibr)*log(r));
                 t1r = iyr+dt-1;
                 t2r = iyr+dt;
 
-                if t2r< 8760*N
+                if t2r< n_hours*n_series
                     Udcconv_n(ibr,iyr:t1r)=1;
                     Udcconv_n(ibr,t2r)=0;
-                    in = floor(t2r/8760);
+                    in = floor(t2r/n_hours);
                     iyr = t2r;
                 else
-                    Udcconv_n(ibr,iyr:8760*N)=1;
-                    in=N;
+                    Udcconv_n(ibr,iyr:n_hours*n_series)=1;
+                    in=n_series;
                 end
 
             else
                 dt = ceil(-MTTRsconv_dc(ibr)*log(r));
                 t1r = iyr+dt-1;
                 t2r = iyr+dt;
-                if t2r < 8760*N
+                if t2r < n_hours*n_series
                     Udcconv_n(ibr,iyr:t1r)=0;
                     Udcconv_n(ibr,t2r)=1;
-                    in = floor(t2r/8760);
+                    in = floor(t2r/n_hours);
                     iyr = t2r;
                 else
-                    Udcconv_n(ibr,iyr:8760*N) = 0;
-                    in = N;
+                    Udcconv_n(ibr,iyr:n_hours*n_series) = 0;
+                    in = n_series;
                 end
             end
         end
@@ -517,7 +528,7 @@ if DCdependent_adequacy == 0
 else
     for dcbr = 1:size(mpc.convdc,1)
         iyr=1;dt=1;in=1;
-        while in < N
+        while in < n_series
             quali_conv = [1 2 ];
             r = rand;
             for ipol = 1:length(quali_conv)
@@ -599,46 +610,46 @@ else
                 switch quali_poli(ipol)
                     case 1
                         if trans_tipo(ipol)==0
-                            if t2r< 8760*N
+                            if t2r< n_hours*n_series
                                 Udcconv_p(dcbr,iyr:t1r)=1;
                                 Udcconv_p(dcbr,t2r)=0;
-                                in =floor(t2r/8760);
+                                in =floor(t2r/n_hours);
                                 iyr=t2r;
                             else
-                                Udcconv_p(dcbr,iyr:8760*N)=1;
-                                in=N;
+                                Udcconv_p(dcbr,iyr:n_hours*n_series)=1;
+                                in=n_series;
                             end
                         else
-                            if t2r< 8760*N
+                            if t2r< n_hours*n_series
                                 Udcconv_p(dcbr,iyr:t1r)=0;
                                 Udcconv_p(dcbr,t2r)=1;
-                                in =floor(t2r/8760);
+                                in =floor(t2r/n_hours);
                                 iyr=t2r;
                             else
-                                Udcconv_p(dcbr,iyr:8760*N)=0;
-                                in=N;
+                                Udcconv_p(dcbr,iyr:n_hours*n_series)=0;
+                                in=n_series;
                             end
                         end
                     case 2
                         if trans_tipo(ipol)==0
-                            if t2r< 8760*N
+                            if t2r< n_hours*n_series
                                 Udcconv_n(dcbr,iyr:t1r)=1;
                                 Udcconv_n(dcbr,t2r)=0;
-                                in =floor(t2r/8760);
+                                in =floor(t2r/n_hours);
                                 iyr=t2r;
                             else
-                                Udcconv_n(dcbr,iyr:8760*N)=1;
-                                in=N;
+                                Udcconv_n(dcbr,iyr:n_hours*n_series)=1;
+                                in=n_series;
                             end
                         else
-                            if t2r< 8760*N
+                            if t2r< n_hours*n_series
                                 Udcconv_n(dcbr,iyr:t1r)=0;
                                 Udcconv_n(dcbr,t2r)=1;
-                                in =floor(t2r/8760);
+                                in =floor(t2r/n_hours);
                                 iyr=t2r;
                             else
-                                Udcconv_n(dcbr,iyr:8760*N)=0;
-                                in=N;
+                                Udcconv_n(dcbr,iyr:n_hours*n_series)=0;
+                                in=n_series;
                             end
                         end
                 end
@@ -647,22 +658,17 @@ else
         end
     end
 end
-for i = 1:N
-    Udcconvs_n{i} = Udcconv_n(:,1+(i-1)*8760:8760*i);
-    Udcconvs_p{i} = Udcconv_p(:,1+(i-1)*8760:8760*i);
+for i = 1:n_series
+    Udcconvs_n{i} = Udcconv_n(:,1+(i-1)*n_hours:n_hours*i);
+    Udcconvs_p{i} = Udcconv_p(:,1+(i-1)*n_hours:n_hours*i);
 end
 
 
 %%% PRINT CSV FILES FOR CSV TREE STRUCTURE
 
-root_path = pwd();
-[root_parent, root_name, root_ext] = fileparts(root_path);
-if ~strcmp(root_name, 'matlab_tools')
-    root_path = strcat(pwd(), '\src\matlab_tools');
-end
-
-for in = 1:N
-    folderctgout = [root_path '\' folderout filesep 'YR_' num2str(in)];
+for in = 1:n_series
+    % folderctgout = [root_path '\' folderout filesep 'YR_' num2str(in)];
+    folderctgout = [folderout filesep 'YR_' num2str(in)];
 
     mkdir(folderctgout);
     mkdir([folderctgout filesep 'branch'])
@@ -670,11 +676,11 @@ for in = 1:N
     mkdir([folderctgout filesep 'gen'])
     csvwrite([folderctgout filesep 'gen' filesep 'gen_status.csv'],[[1:size(mpc.gen,1)];Uacgens{in}']);
     mkdir([folderctgout filesep 'branchdc'])
-    Udcbr_r{in}=Udclines_r{in}(idexdc(find(poli==0)),1:8760);
+    Udcbr_r{in}=Udclines_r{in}(idexdc(find(poli==0)),1:n_hours);
     csvwrite([folderctgout filesep 'branchdc' filesep 'status_r.csv'],[[idexdc(find(poli==0))];Udcbr_r{in}'])
-    Udcbr_p{in}=Udclines_p{in}(idexdc(find(poli==1)),1:8760);
+    Udcbr_p{in}=Udclines_p{in}(idexdc(find(poli==1)),1:n_hours);
     csvwrite([folderctgout filesep 'branchdc' filesep 'status_p.csv'],[[idexdc(find(poli==1))];Udcbr_p{in}'])
-    Udcbr_n{in}=Udclines_n{in}(idexdc(find(poli==2)),1:8760);
+    Udcbr_n{in}=Udclines_n{in}(idexdc(find(poli==2)),1:n_hours);
     csvwrite([folderctgout filesep 'branchdc' filesep 'status_n.csv'],[[idexdc(find(poli==2))];Udcbr_n{in}'])
     mkdir([folderctgout filesep 'convdc'])
     csvwrite([folderctgout filesep 'convdc' filesep 'status_p.csv'],[[1:size(mpc.convdc,1)];Udcconvs_p{in}']);

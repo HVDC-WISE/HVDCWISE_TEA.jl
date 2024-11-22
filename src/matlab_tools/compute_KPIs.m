@@ -1,5 +1,7 @@
-clear
 clc
+if length(who) > 2
+    clear(setdiff(who, {'work_dir'}){:});  % clear all variables except work_dir
+endif
 
 addpath(fileparts(mfilename('fullpath')));
 pkg load io
@@ -8,15 +10,29 @@ MWh_to_TWh = 10^-6;
 t_to_Mt = 10^-6;
 euro_to_Meuro = 10^-6;
 
-inputfile='grid_model'; % grid_model.m has to be in the same folder
-simulation_results_dir = fileread('simulation_results_path.txt');
-parent_names = strsplit(simulation_results_dir, '\');
-macro_scenario = parent_names(end);
-work_dir = strjoin(parent_names(1:end-2), '\');
+% work_dir is a global variable defined inside the run comand in the Julia code
+% work_dir = strjoin(parent_names(1:end-2), '\');
+assert(exist('work_dir', 'var') == 1, "work_dir is not defined")
+
+simulation_dir = [work_dir, '\simulation_interface'];
+macro_scenario = NaN;
+folders=dir(simulation_dir);
+folders(1:2)=[];
+for i=1:length(folders)
+    fifo_name = folders(i).name;
+    if fifo_name(end-1:end) == '.m';
+        macro_scenario = fifo_name(1:end-2);
+    endif
+endfor
+assert(isnan(macro_scenario) == 0, strcat("No .m file has been found in ", simulation_dir))
+
+simulation_results_dir = [simulation_dir, '\', macro_scenario];
 user_results_dir = [work_dir, '\user_interface\results'];
 
-%% load simulation input/output data
-mpc=eval(inputfile);
+%% load grid model (.m file)
+addpath(simulation_dir);
+mpc = feval(macro_scenario);
+rmpath(simulation_dir);
 
 % Matching load_id and bus_id
 bus_to_load = [];  % 1 load id per bus. 0 means no load.
@@ -53,15 +69,15 @@ for scenario_id=1:length(folders)
 
         disp(strcat('KPI computation for scenario', num2str(scenario_id), ': ', scenario_name))
 
-        assert(isfolder([folder_path, 'bus\']), strcat(folder_path, '\', 'bus', ' does not exist'))
+        assert(isfolder([folder_path, 'bus\']) == 1, strcat(folder_path, '\', 'bus', ' does not exist'))
         p_slack = csvread([folder_path, 'bus\p_slack_up.csv'], 1, 0)*mpc.baseMVA-...
             csvread([folder_path, 'bus\p_slack_down.csv'], 1, 0)*mpc.baseMVA;
 
-        assert(isfolder([folder_path, 'gen\']), strcat(folder_path, '\', 'gen', 'does not exist'))
+        assert(isfolder([folder_path, 'gen\']) == 1, strcat(folder_path, '\', 'gen', 'does not exist'))
         pg_gen = csvread([folder_path, 'gen\pg.csv'], 1, 0)*mpc.baseMVA;
         pg_curt = csvread([folder_path, 'gen\pgcurt.csv'], 1, 0)*mpc.baseMVA;
 
-        assert(isfolder([folder_path, 'load\']), strcat(folder_path, '\', 'load', 'does not exist'))
+        assert(isfolder([folder_path, 'load\']) == 1, strcat(folder_path, '\', 'load', 'does not exist'))
         pflex = csvread([folder_path, 'load\pflex.csv'], 1, 0)*mpc.baseMVA;
         pred = csvread([folder_path, 'load\pred.csv'], 1, 0)*mpc.baseMVA;
         pshift_up = csvread([folder_path, 'load\pshift_up.csv'], 1, 0)*mpc.baseMVA;
@@ -340,11 +356,11 @@ units = {"", "", "M€/y", "M€/y", "M€/y", "M€/y", "M€/y", "M€/y", "Mt
 missing_KPIs = setdiff(expected_KPI_names, KPI_names);
 unexpected_KPIs = setdiff(KPI_names, expected_KPI_names);
 if length(missing_KPIs) > 0
-  display(missing_KPIs)
-  error("Missing KPIs names")
+    display(missing_KPIs)
+    error("Missing KPIs names")
 elseif length(unexpected_KPIs) > 0
-  display(unexpected_KPIs)
-  error("Unexpected KPI names")
+    display(unexpected_KPIs)
+    error("Unexpected KPI names")
 endif
 
 for j = 3:8
@@ -367,15 +383,14 @@ data(2, :) = units;
 
 for i = 1:nRows
     for j = 1:nCols
-      data_ij = KPI.(expected_KPI_names{j})(i);  % expected_KPI_names is used instead of KPI_names to ensure coherence with units
-      if isa(data_ij, 'cell')
+        data_ij = KPI.(expected_KPI_names{j})(i);  % expected_KPI_names is used instead of KPI_names to ensure coherence with units
+        if isa(data_ij, 'cell')
         data_ij = data_ij{1};
-      endif
-      data{i+2, j} = data_ij;
+        endif
+        data{i+2, j} = data_ij;
     endfor
 endfor
 
 xlswrite([user_results_dir, '\KPI_results.xlsx'], data);
 
 disp('KPI computation completed')
-

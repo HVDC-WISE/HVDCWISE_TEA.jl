@@ -495,11 +495,6 @@ function build_grid_model(work_dir::String, base_mva::Int)
         end
         write(f, "end\n")
     end
-    matlab_tool_path = joinpath(pwd(), "src", "matlab_tools")
-    if isdir(joinpath(matlab_tool_path, "availability_series"))
-        rm(joinpath(matlab_tool_path, "availability_series"), recursive=true)
-    end
-    cp(matpower_path, joinpath(matlab_tool_path, "grid_model.m"), force=true)
     return model_data
 end
 
@@ -620,6 +615,7 @@ function build_power_series(work_dir::String, base_mva::Int, model_data::Dict)
 end
 
 function build_availability_series(work_dir::String, n_hours::Int, matlab_octave_path::String)
+    #=
     reliability_path = joinpath(work_dir, "user_interface", "inputs", "reliability_data.xlsx")
     @assert isfile(reliability_path)  "$reliability_inputs_path is not a file"
     reliability_file = XLSX.readxlsx(reliability_path)
@@ -628,28 +624,23 @@ function build_availability_series(work_dir::String, n_hours::Int, matlab_octave
     reliability_sheet = reliability_file["user_inputs"]
 
     reliability_data = DataFrames.DataFrame(reliability_sheet[:],:auto)
-    matlab_tool_path = joinpath(pwd(), "src", "matlab_tools")
-    reliability_csv_path = joinpath(matlab_tool_path, "reliability_data.csv")
+    reliability_csv_path = joinpath(matlab_tools_path, "reliability_data.csv")
     CSV.write(reliability_csv_path, reliability_data, writeheader=false)
+    =#
 
-    # series_data[!,"$id"] = [sheet[i,id+1]*unit_conversion for i in 2:n_hours+1]
-    
-
-    # TODO build reliability_data.csv in matlab_tool_path from reliability_data.xlsx in work
-
-    # println("Run build_availability_series.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
-    # a = readline();  # TODO automatically run src/matlab_tools/build_availability_series.m or recode it in Julia
+    matlab_tools_path = joinpath(dirname(@__DIR__), "matlab_tools")
     println("Building availability series")
-    run_matlab_script(joinpath(matlab_tool_path, "build_availability_series.m"), matlab_octave_path)
-
-    availability_series_dir = joinpath(matlab_tool_path, "availability_series")
+    kwargs = Dict("work_dir" => work_dir, "n_hours" => n_hours)
+    run_matlab_script(joinpath(matlab_tools_path, "build_availability_series.m"), matlab_octave_path, kwargs)
+    #=
+    availability_series_dir = joinpath(matlab_tools_path, "availability_series")
     for microscenario in  readdir(availability_series_dir)
         micro_dir = joinpath(availability_series_dir, microscenario)
         for comp_name in readdir(micro_dir)
             comp_dir = joinpath(micro_dir, comp_name)
             for csv_name in readdir(comp_dir)
                 csv_path = joinpath(comp_dir, csv_name)
-                @assert occursin(".csv", csv_name)  "$matlab_tool_path/availability_series/$microscenario/$comp_name/$csv_name is not a CSV file"
+                @assert occursin(".csv", csv_name)  "$matlab_tools_path/availability_series/$microscenario/$comp_name/$csv_name is not a CSV file"
                 csv_data = CSV.File(csv_path, delim=',') |> DataFrames.DataFrame
                 csv_hours = size(csv_data)[1]
                 @assert csv_hours >= n_hours  "$csv_hours hours are available in $csv_path. You cannot have $n_hours hours."
@@ -661,14 +652,6 @@ function build_availability_series(work_dir::String, n_hours::Int, matlab_octave
             end
         end
     end
-    # rm(joinpath(matlab_tool_path, "grid_model.m"))  # This file will be deleted after results post-processing
-    rm(joinpath(matlab_tool_path, "reliability_data.csv"))
-    rm(joinpath(matlab_tool_path, "availability_series"), recursive=true)
+    rm(joinpath(matlab_tools_path, "reliability_data.csv"))
+    =#
 end
-
-#=
-# Code to test the functions in this script:
-println("Builds simulation inputs")
-build_simulation_inputs(joinpath(pwd(), "studies\\simple_use_case"))
-println("Simulation inputs building finished")
-=#

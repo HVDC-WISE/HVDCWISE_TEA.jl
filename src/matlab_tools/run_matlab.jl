@@ -1,12 +1,24 @@
 # Run a matlab script
-function run_matlab_script(script_path::String, tool_path::String)
+function run_matlab_script_v1(script_path::String, tool_path::String)
     if occursin("matlab", basename(tool_path))
         run(`$tool_path -batch "$script_path"`) # -batch to launch Matlab without graphical interface
     elseif occursin("octave", basename(tool_path))
         run(`$tool_path --no-gui "$script_path"`) # --no-gui to launch Octave without graphical interface
     end
 end
-# run(`"C:\\Users\\n.barla\\AppData\\Local\\Programs\\GNU Octave\\Octave-9.2.0\\octave.vbs\r\n" --no-gui 'C:\\Users\\n.barla\\Documents\\Local_codes\\HVDCWISE_TEA.jl\\src\\matlab_tools\\build_availability_series.m'`)
+
+# Run a matlab script
+function run_matlab_script(script_path::String, tool_path::String, kwargs::Dict)
+    commands = "run('$script_path');"
+    for (key, value) in kwargs
+        commands = "$key = '$value'; $commands"
+    end
+    if occursin("matlab", basename(tool_path))
+        run(`$tool_path -batch  --eval "$commands"`) # -batch to launch Matlab without graphical interface
+    elseif occursin("octave", basename(tool_path))
+        run(`$tool_path --no-gui --eval "$commands"`) # --no-gui to launch Octave without graphical interface
+    end
+end
 # Function to detect if Matlab or Octave is installed
 function detect_matlab_or_octave()
     if Sys.iswindows()

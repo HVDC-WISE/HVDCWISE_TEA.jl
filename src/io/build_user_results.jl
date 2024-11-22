@@ -16,9 +16,6 @@ function build_user_results(work_dir::String, base_mva::Int, matlab_octave_path:
         end
     end
 
-    # Write simulation results folder name in a file of the matlab tool folder
-    matlab_tool_path = joinpath(pwd(), "src", "matlab_tools")
-    write(joinpath(matlab_tool_path,"simulation_results_path.txt"), joinpath(simulation_dir, macro_scenario))
 
     # Build user results (Julia code)
     user_results_dir = joinpath(work_dir, "user_interface", "results")
@@ -32,14 +29,10 @@ function build_user_results(work_dir::String, base_mva::Int, matlab_octave_path:
     totex = totex_summary(opex, capex)
 
     # Build user results (Matlab code)
-    # println("Run compute_KPIs.m in $matlab_tool_path. Then write 'y' and press twice ENTER.")
-    # a = readline();  # TODO automatically run src/matlab_tools/compute_KPIs.m or recode it in Julia
     println("Computing KPIs")
-    run_matlab_script(joinpath(matlab_tool_path, "compute_KPIs.m"), matlab_octave_path)
-
-    # Delete study files in the matlab tool folder
-    rm(joinpath(matlab_tool_path, "grid_model.m"))
-    rm(joinpath(matlab_tool_path,"simulation_results_path.txt"))
+    kwargs = Dict("work_dir" => work_dir)
+    matlab_tools_path = joinpath(dirname(@__DIR__), "matlab_tools")
+    run_matlab_script(joinpath(matlab_tools_path, "compute_KPIs.m"), matlab_octave_path, kwargs)
 end
 
 
