@@ -5,13 +5,13 @@ function reliability_data = read_reliability_data(work_dir)
     assert(exist('work_dir', 'var') == 1, "work_dir is not defined")
 
     simulation_dir = [work_dir, '\simulation_interface'];
-    macro_scenario = NaN
+    macro_scenario = NaN;
     folders=dir(simulation_dir);
     folders(1:2)=[];
     for i=1:length(folders)
-        fifo_name = folders(i).name
+        fifo_name = folders(i).name;
         if fifo_name(end-1:end) == '.m'
-            macro_scenario = fifo_name(1:end-2)
+            macro_scenario = fifo_name(1:end-2);
         endif
     endfor
     assert(isnan(macro_scenario) == 0, strcat("No .m file has been found in ", simulation_dir))

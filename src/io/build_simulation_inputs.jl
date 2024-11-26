@@ -53,7 +53,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
     for file_name in readdir(user_inputs_dir)
         if occursin("_model.xlsx", file_name)
             @assert (macro_scenario == "")  "2 files could contain the grid model data: $macro_scenario" * "_model.xlsx and $file_name. Please delete or rename the wrong file."
-            macro_scenario = file_name[1:length(file_name)-11]
+            macro_scenario = replace(file_name[1:length(file_name)-11], " " => "_")
         end
     end
     @assert (macro_scenario != "") "The file containing the grid model data should end with '_model.xlsx'. This file has not been found in $user_inputs_dir."

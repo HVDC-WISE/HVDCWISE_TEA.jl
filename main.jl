@@ -1,6 +1,4 @@
 using Distributed
-using HVDCWISE_TEA
-import HiGHS
 
 ## Workers setup
 nprocs() > 1 && rmprocs(workers())
@@ -12,8 +10,8 @@ addprocs(Sys.CPU_THREADS ÷ 2; exeflags = "--project=$(Base.active_project())")
 end
 
 # Directory containing user inputs in the subfolder "user_interface/inputs"
-HWTEA_dir = dirname(dirname(pathof(HVDCWISE_TEA)))  # Root path of the project
-work_dir = joinpath(HWTEA_dir, "studies\\simple_use_case")  # Folder 'studies' is ignored by git
+main_dir = @__DIR__  # Directory of the current file
+work_dir = joinpath(main_dir, "studies\\simple_use_case")  # Folder 'studies' is ignored by git
 
 # The yearly problem is split into subproblems of this size (1 week is 168h, 1 month is 720h, 1 year is 8760h)
 hours_per_subsimulation = 168
@@ -27,7 +25,7 @@ optimizer = HVDCWISE_TEA.optimizer_with_attributes(HiGHS.Optimizer, setting_opt.
 setting = Dict("output" => Dict("branch_flows" => true, "duals" =>false), "conv_losses_mp" => false);
 
 # Verify that Matlab or Octave is installed
-matlab_octave_path = detect_matlab_or_octave()  # You can replace this line by the path of your Matlab/Octave launcher. for example: "C:/Users/n.barla/AppData/Local/Programs/GNU Octave/Octave-9.2.0/octave-launch.exe"
+matlab_octave_path = HVDCWISE_TEA.detect_matlab_or_octave()  # You can replace this line by the path of your Matlab/Octave launcher. For example: "C:/Users/n.barla/AppData/Local/Programs/GNU Octave/Octave-9.2.0/octave-launch.exe"
 
 # Run the study
-@time run_study(work_dir, hours_per_subsimulation, base_MVA, optimizer, setting, matlab_octave_path)
+@time HVDCWISE_TEA.run_study(work_dir, hours_per_subsimulation, base_MVA, optimizer, setting, matlab_octave_path)
