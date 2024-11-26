@@ -10,6 +10,10 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Fixed
 
 ## [add_tests] - 2024-11-25
+### Fix
+- Space in macro-scenario
+
+## [add_tests] - 2024-11-25
 ### Changed
 - Replace "" by "_" in macro-scenario
 - Update main.jl

@@ -48,16 +48,18 @@ function build_grid_model(work_dir::String, base_mva::Int)
     user_inputs_dir = joinpath(user_dir, "inputs")
     @assert isdir(user_inputs_dir) "The user_dir ($user_dir) should contain a folder 'inputs'"
 
+    macro_scenario_raw = ""
     macro_scenario = ""
 
     for file_name in readdir(user_inputs_dir)
         if occursin("_model.xlsx", file_name)
             @assert (macro_scenario == "")  "2 files could contain the grid model data: $macro_scenario" * "_model.xlsx and $file_name. Please delete or rename the wrong file."
-            macro_scenario = replace(file_name[1:length(file_name)-11], " " => "_")
+            macro_scenario_raw = file_name[1:length(file_name)-11]
+            macro_scenario = replace(macro_scenario_raw, " " => "_")
         end
     end
     @assert (macro_scenario != "") "The file containing the grid model data should end with '_model.xlsx'. This file has not been found in $user_inputs_dir."
-    model_path = joinpath(user_inputs_dir, "$macro_scenario"*"_model.xlsx")
+    model_path = joinpath(user_inputs_dir, "$macro_scenario_raw"*"_model.xlsx")
     @assert isfile(model_path)  "$model_path is not a file"
 
     costs_path = joinpath(user_inputs_dir, "costs_data.xlsx")
