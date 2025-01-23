@@ -1,6 +1,8 @@
+% Code developed by Marco ROSSI (RSE) and Nicolas BARLA (SuperGrid Institute)
 clc
-if length(who) > 2
-    clear(setdiff(who, {'work_dir'}){:});  % clear all variables except work_dir
+vars_to_delete = setdiff(who, {'work_dir'});
+if length(vars_to_delete) > 0
+    clear(vars_to_delete{:});  % clear all variables except work_dir
 endif
 
 addpath(fileparts(mfilename('fullpath')));

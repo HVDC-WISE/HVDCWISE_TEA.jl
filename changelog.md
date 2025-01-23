@@ -9,7 +9,16 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
-## [add_tests] - 2024-11-25
+## [add_tests] - 2025-01-23
+### Added
+- Length in Macro-scenario template
+### Changed
+- Reliability data template
+- Refactor build_availability_series.m
+### Fix
+- Right line lengths considered in availability series generation
+
+## [add_tests] - 2024-11-26
 ### Fix
 - Space in macro-scenario
 

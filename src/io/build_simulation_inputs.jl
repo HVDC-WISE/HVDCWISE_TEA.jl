@@ -3,13 +3,13 @@ using CSV
 import DataFrames
 using XLSX
 
-function build_simulation_inputs(work_dir::String, base_mva::Int, matlab_octave_path::String)
+function build_simulation_inputs(work_dir::String, previous_work_dir, n_availability_series, base_mva::Int, matlab_octave_path::String)
     model_data = build_grid_model(work_dir, base_mva)
     power_series_info = build_power_series(work_dir, base_mva, model_data)
     n_power_series = power_series_info["n_series"]  # Not used
     n_hours = power_series_info["n_hours"]
 
-    build_availability_series(work_dir, n_hours, matlab_octave_path::String)
+    build_availability_series(work_dir, previous_work_dir, n_availability_series, n_hours, matlab_octave_path::String)
 end
 
 function base_to_pu(value::Float64, unit::String, base_mva::Int, base_kv::Int)
@@ -102,8 +102,8 @@ function build_grid_model(work_dir::String, base_mva::Int)
     model_attributes = Dict(
         "bus" => ["base voltage"],
         "busdc" => ["base voltage"], 
-        "branch" => ["from bus id",  "to bus id", "type", "power rating", "resistance", "reactance"], 
-        "branchdc" => ["from bus id",  "to bus id", "type", "configuration", "power rating", "resistance"], 
+        "branch" => ["from bus id",  "to bus id", "type", "length", "power rating", "resistance", "reactance"], 
+        "branchdc" => ["from bus id",  "to bus id", "type", "length", "configuration", "power rating", "resistance"], 
         "convdc" => ["AC bus id",  "DC bus id", "type", "configuration", "power rating"],
         "gen" => ["bus id", "type", "power rating"], 
         "gen_res" => ["bus id", "type", "power rating"], 
@@ -616,44 +616,9 @@ function build_power_series(work_dir::String, base_mva::Int, model_data::Dict)
     return Dict("n_series" => length(micro_scenarios), "n_hours" => n_hours)
 end
 
-function build_availability_series(work_dir::String, n_hours::Int, matlab_octave_path::String)
-    #=
-    reliability_path = joinpath(work_dir, "user_interface", "inputs", "reliability_data.xlsx")
-    @assert isfile(reliability_path)  "$reliability_inputs_path is not a file"
-    reliability_file = XLSX.readxlsx(reliability_path)
-    sheet_names = XLSX.sheetnames(reliability_file)
-    @assert "user_inputs" in sheet_names  "file $reliability_path should have a sheet 'user_inputs'"
-    reliability_sheet = reliability_file["user_inputs"]
-
-    reliability_data = DataFrames.DataFrame(reliability_sheet[:],:auto)
-    reliability_csv_path = joinpath(matlab_tools_path, "reliability_data.csv")
-    CSV.write(reliability_csv_path, reliability_data, writeheader=false)
-    =#
-
+function build_availability_series(work_dir::String, previous_work_dir, n_series, n_hours::Int, matlab_octave_path::String)
     matlab_tools_path = joinpath(dirname(@__DIR__), "matlab_tools")
     println("Building availability series")
-    kwargs = Dict("work_dir" => work_dir, "n_hours" => n_hours)
+    kwargs = Dict("work_dir" => work_dir, "previous_work_dir" => previous_work_dir, "n_series" => n_series, "n_hours" => n_hours)
     run_matlab_script(joinpath(matlab_tools_path, "build_availability_series.m"), matlab_octave_path, kwargs)
-    #=
-    availability_series_dir = joinpath(matlab_tools_path, "availability_series")
-    for microscenario in  readdir(availability_series_dir)
-        micro_dir = joinpath(availability_series_dir, microscenario)
-        for comp_name in readdir(micro_dir)
-            comp_dir = joinpath(micro_dir, comp_name)
-            for csv_name in readdir(comp_dir)
-                csv_path = joinpath(comp_dir, csv_name)
-                @assert occursin(".csv", csv_name)  "$matlab_tools_path/availability_series/$microscenario/$comp_name/$csv_name is not a CSV file"
-                csv_data = CSV.File(csv_path, delim=',') |> DataFrames.DataFrame
-                csv_hours = size(csv_data)[1]
-                @assert csv_hours >= n_hours  "$csv_hours hours are available in $csv_path. You cannot have $n_hours hours."
-                used_data = csv_data[1:n_hours,:]
-                new_comp_dir = joinpath(work_dir, "simulation_interface", "Input_series", "Availability", microscenario, comp_name)
-                mkpath(new_comp_dir)
-                new_csv_path = joinpath(new_comp_dir, csv_name)
-                CSV.write(new_csv_path, used_data, writeheader=true)
-            end
-        end
-    end
-    rm(joinpath(matlab_tools_path, "reliability_data.csv"))
-    =#
 end

@@ -32,147 +32,180 @@ function reliability_data = read_reliability_data(work_dir)
 
     [~, ~, sheet] = xlsread(reliability_data_path);
 
-    column_titles = {"Parameter", "Value", "Unit", "Scope", "Meaning"};
-    for j = 1:5
-        assert(sheet{1,j} == column_titles{j}, strcat("First cell of column ", num2str(j), " should be ", column_titles{j}, ", not ", sheet{1,j}))
+    line_titles = {"Attribute", "Unit", "Description"};
+    for i = 1:3
+        assert(sheet{i,1} == line_titles{i}, strcat("Cell A", num2str(i), " in ", reliability_data_path, " should be ", line_titles{i}, ", not ", sheet{i,1}))
+    endfor
+
+    attributes = {"Attribute", "MTTR", "FOR", "Failure rate 0", "Failure rate per km", "Correlation between poles"};
+    units = {"Unit", "h", "%", "1/y", "1/y/km", "Number between 0 & 1"};
+    for j = 2:6
+        assert(strcmp(sheet{1,j}, attributes{j}), strcat("First cell of column ", num2str(j), " in ", reliability_data_path, " should be ", attributes{j}, ", not ", sheet{1,j}))
+        assert(strcmp(sheet{2,j}, units{j}), strcat("Unit for attribute ", attributes{j}, " in ", reliability_data_path, " should be ", units{j}, ", not ", sheet{2,j}))
     end
 
-    Parameter = sheet(2:end, 1);
-    Values = cell2mat(sheet(2:end, 2)); % Convert column 1 into a matrix of floats
+    % Input data
+    input_data = struct();
 
-    parameters = {"N",
-    "MTTR_genac", % hour
-    "FOR_genac", % unavailability rate (forced outage rate)
-    "MTTR_trac",
-    "FOR_trac",
-    "MTTR_convdc",
-    "FOR_convdc",
-    "MTTR_ohlac", % hour (for normal events)
-    "MTTR_ohlac_resil", % hour (for extreme events)
-    "failurerate_fixe_ohlac", % per year
-    "failurerate_perkm_ohlac", % per year per km
-    "MTTRbr_ohldc",
-    "MTTRbr_ohldc_resil",
-    "failurerate_fixe_ohldc",
-    "failurerate_perkm_ohldc",
-    "MTTR_cabledc",
-    "MTTR_cabledc_resil",
-    "failurerate_perkm_cabledc",
-    };
+    % Components without a length
+    components_localised = {"Generator", "Transformer", "Converter ACDC"};
+    for i = 4:6
+        comp_name = components_localised{i-3};
+        assert(sheet{i,1} == comp_name, strcat("Cell A", num2str(i), " in ", reliability_data_path, " should be ", comp_name, ", not ", sheet{i,1}))
+        for j = 2:3
+            assert(isempty(sheet{i,j}) == 0, strcat("No cell in B", num2str(i), ":C", num2str(i), " in ", reliability_data_path, " should be empty. ", mat2str(sheet{i,2:3})))
+        endfor
+        comp_name = strrep(comp_name, " ", "_");
+        input_data.(comp_name) = struct();
+        input_data.(comp_name).MTTR = sheet{i,2};
+        input_data.(comp_name).FOR = sheet{i,3};
+    endfor
 
-    n_series = Values(1); % Number of time series to be sampled (for N-1 independent unavailabilities)
-    [MTTR_genac, FOR_genac] = deal(num2cell(Values(2:3)){:}); % Generator
-    [MTTR_trac, FOR_trac] = deal(num2cell(Values(4:5)){:}); % Transformer
-    [MTTR_convdc, FOR_convdc] = deal(num2cell(Values(6:7)){:}); % Converter
-    [MTTR_ohlac, MTTR_ohlac_resil, failurerate_fixe_ohlac, failurerate_perkm_ohlac] = deal(num2cell(Values(8:11)){:}); % AC lines
-    [MTTRbr_ohldc, MTTRbr_ohldc_resil, failurerate_fixe_ohldc, failurerate_perkm_ohldc] = deal(num2cell(Values(12:15)){:}); % DC OHL
-    [MTTR_cabledc, MTTR_cabledc_resil, failurerate_perkm_cabledc] = deal(num2cell(Values(16:18)){:}); % DC cable
+    % Components with a length
+    components_linear = {"AC OHL", "DC OHL", "DC cable"};
+    for i = 7:9
+        comp_name = components_linear{i-6};
+        assert(strcmp(sheet{i,1}, comp_name), strcat("Cell A", num2str(i), " in ", reliability_data_path, " should be ", comp_name, ", not ", sheet{i,1}))
+        assert(isempty(sheet{i,2}) == 0, strcat("Cell B", num2str(i), " in ", reliability_data_path, " should not be empty. ", mat2str(sheet{i,2})))
+        for j = 4:5
+            assert(isempty(sheet{i,j}) == 0, strcat("No cell in D", num2str(i), ":E", num2str(i), " in ", reliability_data_path, " should be empty. ", mat2str(sheet{i,4:5})))
+        endfor
+        comp_name = strrep (comp_name, " ", "_");
+        input_data.(comp_name) = struct();
+        input_data.(comp_name).MTTR = sheet{i,2};
+        input_data.(comp_name).failurerate_0 = sheet{i,4};
+        input_data.(comp_name).failurerate_perkm = sheet{i,5};
+    endfor
 
-    % Correlation between pole failures
-    corr_dcpoles_adequacy = 0.5; % correlation among the wires (P, N and R) of DC branches for adequacy assessment analyses on N-1 ctgs
-    DCdependent_adequacy = 0; % considering correlation among the wires of DC branches (1= considered, 0=not considered)
-    corr_dcpoles_resilience = 0.7; % correlation among the wires (P, N and R) of DC branches for resilience assessment analyses (N-k ctgs)
-
-    %%% --- Other hypotheses ---
+    % DC components (with several poles)
+    dc_components = {"Converter ACDC", "DC OHL", "DC cable"};
+    dc_rows = [6, 8, 9];
+    for i = 1:3
+        row = dc_rows(i);
+        comp_name = strrep(dc_components{i}, " ", "_");
+        assert(isempty(sheet{row,6}) == 0, strcat("Cell F", num2str(row), " in ", reliability_data_path, " should not be empty."))
+        correlation_poles.(comp_name) = sheet{row,6};
+    endfor
 
     warning off
 
-    %%%%%%%% adding data about type of DC branch (1 = overhead, 0 = cable)
-    mpc.branchdc(:,17) = 0; %
-    % adding percentage of cable type over the total length (not used in the % release)
-    mpc.branchdc(:,18) = 0.1; % pu of cable;
+    % Length & type per component
+    macro_data_path = [work_dir, '\user_interface\inputs\', macro_scenario, '_model.xlsx'];
+    assert(isfile(macro_data_path) == 1, strcat(macro_data_path, " does not exist"))
 
-    % giving names to buses AC and DC
+    [~, ~, branch_sheet] = xlsread(macro_data_path, 'branch');
+    assert(branch_sheet{1,5} == "type", strcat("Cell E1 in sheet branch in ", macro_data_path, " should be type, not ", branch_sheet{1,5}))
+    assert(branch_sheet{1,6} == "length", strcat("Cell F1 in sheet branch in ", macro_data_path, " should be type, not ", branch_sheet{1,6}))
+
+    [~, ~, branchdc_sheet] = xlsread(macro_data_path, 'branchdc');
+    assert(branchdc_sheet{1,5} == "type", strcat("Cell E1 in sheet branch in ", macro_data_path, " should be type, not ", branchdc_sheet{1,5}))
+    assert(branchdc_sheet{1,6} == "length", strcat("Cell F1 in sheet branch in ", macro_data_path, " should be type, not ", branchdc_sheet{1,6}))
+    branchdc_lengths = branchdc_sheet{4:3+size(mpc.branchdc,1),6};  % km
+
+    % Giving names to buses AC and DC
     for j = 1:size(mpc.bus,1)
-    mpc.bus_name{j} = ['AC-' num2str(mpc.bus(j,1))];
+        mpc.bus_name{j} = ['AC-' num2str(mpc.bus(j,1))];
     end
     for j = 1:size(mpc.busdc,1)
-    mpc.busdc_name{j} = ['DC-' num2str(mpc.busdc(j,1))];
+        mpc.busdc_name{j} = ['DC-' num2str(mpc.busdc(j,1))];
     end
 
     mpc0 = mpc;
-    % correspondence between wires N,R,P and DC branches
-    idexdc = [];poli=[];
+    % Correspondence between wires N,R,P and DC branches id & type & length
+    branchdc_id_per_pole = [];  % branchdc indexes (1 value per pole P/N/R)
+    pole_ids=[];  % 1 value per pole per branchdc: 0=R, 1=P, 2=N
+    branchdc_lengths_per_pole = [];
+    branchdc_types = {};  % 'DC cable' or 'DC OHL'
+    branchdc_type_per_pole = [];  % 1 for DC cable, 2 for DC OHL
+    dc_type_cable = 1;
+    dc_type_ohl = 2;
     for i = 1:size(mpc0.branchdc,1)
-        if mpc0.branchdc(i,10)==2
-            for ipol = 1:3
-                idexdc = [idexdc i];
-                poli=[poli ipol-1];
-            end
+        dc_length = branchdc_sheet{3+i,6};
+        branchdc_type = branchdc_sheet{3+i,5};
+        branchdc_types{i} = branchdc_type;
+        if strcmp(branchdc_type, "DC cable")
+            dc_type = dc_type_cable;
         else
-            quali_poli = find(mpc.branchdc(i,14:16)==1); %1 =p,2=n, 3=r
-            for ipol = 1:length(quali_poli)
-                idexdc = [idexdc i];
-                switch quali_poli(ipol)
+            assert(strcmp(branchdc_type, "DC OHL"), strcat("Type for DC branch ", i, " should be 'DC cable' or 'DC OHL', not ", branchdc_type))
+            dc_type = dc_type_ohl;
+        endif
+        if mpc0.branchdc(i,10)==2  % Column 10 is line_confi (1=monopolar, 2=bipolar)
+            for pole_id = 1:3
+                branchdc_lengths_per_pole = [branchdc_lengths_per_pole, dc_length];
+                branchdc_type_per_pole = [branchdc_type_per_pole, dc_type];
+                branchdc_id_per_pole = [branchdc_id_per_pole i];
+                pole_ids=[pole_ids pole_id-1];
+            end
+        else  % Monopolar branchdc
+            used_poles = find(mpc.branchdc(i,14:16)==1);  % 14=status_p, 15=status_n, 16=status_r
+            for pole_id = 1:length(used_poles)
+                branchdc_lengths_per_pole = [branchdc_lengths_per_pole, dc_length];
+                branchdc_type_per_pole = [branchdc_type_per_pole, dc_type];
+                branchdc_id_per_pole = [branchdc_id_per_pole i];
+                switch used_poles(pole_id)
                     case 1
-                        poli=[poli 1];
+                        pole_ids=[pole_ids 1];
                     case 2
-                        poli=[poli 2];
+                        pole_ids=[pole_ids 2];
                     case 3
-                        poli=[poli 0];
+                        pole_ids=[pole_ids 0];
                 end
             end
         end
     end
 
+    dc_cable_id_per_pole = find(branchdc_type_per_pole == dc_type_cable);
+    dc_ohl_id_per_pole = find(branchdc_type_per_pole == dc_type_ohl);
+
+    % Indexes per type of AC branch
+    branch_types = [];  % 1 for AC OHL, 2 for Transformer
+    ac_type_ohl = 1;
+    ac_type_transformer = 2;
+    ac_ohl_lengths = [];  % Length (in km) of each AC OHL
+
+    for i=1:size(mpc.branch,1)
+        branch_type = branch_sheet{3+i,5};
+        if strcmp(branch_type, "AC OHL")
+            ac_type = ac_type_ohl;
+            ac_ohl_lengths = [ac_ohl_lengths, branch_sheet{3+i,6}];  % km
+        else
+            assert(strcmp(branch_type, "Transformer"), strcat("Type for AC branch ", i, " should be 'AC OHL' or 'Transformer', not ", branch_type))
+            ac_type = ac_type_transformer;
+        endif
+        branch_types = [branch_types, ac_type];
+    endfor
+    ac_ohl_ids = find(branch_types == ac_type_ohl);
+    transfo_ids = find(branch_types == ac_type_transformer);
+
     %%% --- Computation of MTTR & MTTF for each component ---
 
-    %% Line lengths & transformer indexes
-    Llinee = mpc.branch(find(mpc.branch(:,9)==0),4)/0.02;
-    LeLinee = find(mpc.branch(:,9)==0);
-    iTrafi = find(mpc.branch(:,9)>0);
-    LlineeDc = mpc.branchdc(idexdc,3)/0.002;
-
     % Generator
-    MTTRsgen_ac = ones(1,size(mpc.gen,1)).*MTTR_genac;
-    MTTFsgen_ac = MTTRsgen_ac*(1/FOR_genac - 1);
+    MTTRsgen_ac = ones(1,size(mpc.gen,1)).*input_data.Generator.MTTR;
+    MTTFsgen_ac = MTTRsgen_ac*(1/input_data.Generator.FOR - 1);
 
     % Transformer
-    MTTFbrs_ac(iTrafi) = MTTR_trac*(1/FOR_trac - 1);
-    MTTRbrs_ac(iTrafi) = MTTR_trac;
+    MTTRbrs_ac(transfo_ids) = input_data.Transformer.MTTR;
+    MTTFbrs_ac(transfo_ids) = input_data.Transformer.MTTR*(1/input_data.Transformer.FOR - 1);
 
     % Converter
-    MTTRsconv_dc = ones(1,size(mpc.convdc,1)).*MTTR_convdc;
-    MTTFsconv_dc = MTTRsconv_dc.*(1/FOR_convdc - 1);
+    MTTRsconv_dc = ones(1,size(mpc.convdc,1)).*input_data.Converter_ACDC.MTTR;
+    MTTFsconv_dc = MTTRsconv_dc.*(1/input_data.Converter_ACDC.FOR - 1);
 
-    % AC lines
-    MTTRbrs_ac(LeLinee) = MTTR_ohlac;
-    MTTRbrs_ac_resil = ones(1,length(MTTFbrs_ac))*MTTR_ohlac_resil;
-    MTTFbrs_ac(LeLinee) = 8760./(Llinee*failurerate_perkm_ohlac + failurerate_fixe_ohlac);
+    % AC OHL
+    MTTRbrs_ac(ac_ohl_ids) = input_data.AC_OHL.MTTR;
+    MTTFbrs_ac(ac_ohl_ids) = 8760./(ac_ohl_lengths(ac_ohl_ids).*input_data.AC_OHL.failurerate_perkm + input_data.AC_OHL.failurerate_0);
 
     % DC OHL
-    MTTRbrs_dc(find(mpc.branchdc(idexdc,17)==1)) = MTTRbr_ohldc; % suppose all are cables
-    MTTFbrs_dc(find(mpc.branchdc(idexdc,17)==1)) = 8760./(LlineeDc(find(mpc.branchdc(idexdc,17)==1))'.*failurerate_perkm_ohldc + failurerate_fixe_ohldc);
-    MTTRbrs_dc_resil(find(mpc.branchdc(idexdc,17)==1)) = ones(1,length((find(mpc.branchdc(idexdc,17)==1))))*MTTRbr_ohldc_resil;
+    MTTRbrs_dc(dc_ohl_id_per_pole) = input_data.DC_OHL.MTTR;
+    MTTFbrs_dc(dc_ohl_id_per_pole) = 8760./(branchdc_lengths_per_pole(dc_ohl_id_per_pole).*input_data.DC_OHL.failurerate_perkm + input_data.DC_OHL.failurerate_0);
 
     % DC cable
-    MTTRbrs_dc(find(mpc.branchdc(idexdc,17)==0)) = MTTR_cabledc; % suppose all are cables
-    MTTFbrs_dc(find(mpc.branchdc(idexdc,17)==0)) = 8760./(LlineeDc(find(mpc.branchdc(idexdc,17)==0))'.*failurerate_perkm_cabledc);
-    MTTRbrs_dc_resil(find(mpc.branchdc(idexdc,17)==0)) = ones(1,length(find(mpc.branchdc(idexdc,17)==0)))*MTTR_cabledc_resil;
+    MTTRbrs_dc(dc_cable_id_per_pole) = input_data.DC_cable.MTTR;
+    MTTFbrs_dc(dc_cable_id_per_pole) = 8760./(branchdc_lengths_per_pole(dc_cable_id_per_pole).*input_data.DC_cable.failurerate_perkm + input_data.DC_cable.failurerate_0);
 
     % Data to return
-    reliability_data.n_series = n_series;
     reliability_data.mpc = mpc;
-    # reliability_data.mpc0 = mpc0;
     reliability_data.output_folder = output_folder;
-
-    # reliability_data.MTTR_genac = MTTR_genac;
-    # reliability_data.FOR_genac = FOR_genac;
-    # reliability_data.MTTR_trac = MTTR_trac;
-    # reliability_data.FOR_trac = FOR_trac;
-    # reliability_data.MTTR_convdc = MTTR_convdc;
-    # reliability_data.FOR_convdc = FOR_convdc;
-    # reliability_data.MTTR_ohlac = MTTR_ohlac;
-    # reliability_data.MTTR_ohlac_resil = MTTR_ohlac_resil;
-    # reliability_data.failurerate_fixe_ohlac = failurerate_fixe_ohlac;
-    # reliability_data.failurerate_perkm_ohlac = failurerate_perkm_ohlac;
-    # reliability_data.MTTRbr_ohldc = MTTRbr_ohldc;
-    # reliability_data.MTTRbr_ohldc_resil = MTTRbr_ohldc_resil;
-    # reliability_data.failurerate_fixe_ohldc = failurerate_fixe_ohldc;
-    # reliability_data.failurerate_perkm_ohldc = failurerate_perkm_ohldc;
-    # reliability_data.MTTR_cabledc = MTTR_cabledc;
-    # reliability_data.MTTR_cabledc_resil = MTTR_cabledc_resil;
-    # reliability_data.failurerate_perkm_cabledc = failurerate_perkm_cabledc;
 
     reliability_data.MTTRsgen_ac = MTTRsgen_ac;
     reliability_data.MTTFsgen_ac = MTTFsgen_ac;
@@ -186,10 +219,9 @@ function reliability_data = read_reliability_data(work_dir)
     reliability_data.MTTRsconv_dc = MTTRsconv_dc;
     reliability_data.MTTFsconv_dc = MTTFsconv_dc;
 
-    reliability_data.corr_dcpoles_adequacy = corr_dcpoles_adequacy;
-    reliability_data.DCdependent_adequacy = DCdependent_adequacy;
-    reliability_data.corr_dcpoles_resilience = corr_dcpoles_resilience;
+    reliability_data.branchdc_types = branchdc_types;
+    reliability_data.correlation_poles = correlation_poles;
 
-    reliability_data.idexdc = idexdc;
-    reliability_data.poli = poli;
+    reliability_data.branchdc_id_per_pole = branchdc_id_per_pole;
+    reliability_data.pole_ids = pole_ids;
 end

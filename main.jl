@@ -11,7 +11,13 @@ end
 
 # Directory containing user inputs in the subfolder "user_interface/inputs"
 main_dir = @__DIR__  # Directory of the current file
-work_dir = joinpath(main_dir, "studies\\simple_use_case")  # Folder 'studies' is ignored by git
+work_dir = joinpath(main_dir, "studies\\study_2")  # Folder 'studies' is ignored by git
+
+# Directory of another macro-scenario. Used to ensure consistency of availability time series between macro-scenarios. If no pre-existing macro-scenario: previous_work_dir = ""
+previous_work_dir = joinpath(main_dir, "studies\\study_1")
+
+# Number of contingency time series to generated. N_microscenarios = n_availability_series * N_power_series
+n_availability_series = 2
 
 # The yearly problem is split into subproblems of this size (1 week is 168h, 1 month is 720h, 1 year is 8760h)
 hours_per_subsimulation = 168
@@ -28,4 +34,4 @@ setting = Dict("output" => Dict("branch_flows" => true, "duals" =>false), "conv_
 matlab_octave_path = HVDCWISE_TEA.detect_matlab_or_octave()  # You can replace this line by the path of your Matlab/Octave launcher. For example: "C:/Users/n.barla/AppData/Local/Programs/GNU Octave/Octave-9.2.0/octave-launch.exe"
 
 # Run the study
-@time HVDCWISE_TEA.run_study(work_dir, hours_per_subsimulation, base_MVA, optimizer, setting, matlab_octave_path)
+@time HVDCWISE_TEA.run_study(work_dir, previous_work_dir, n_availability_series, hours_per_subsimulation, base_MVA, optimizer, setting, matlab_octave_path)

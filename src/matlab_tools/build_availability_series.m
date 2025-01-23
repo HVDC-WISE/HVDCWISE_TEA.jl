@@ -1,17 +1,32 @@
-% script for the generation of unavailabilities seriesfor N-1 outages including HVDC assets
+% Code developed by Andrea PITTO (RSE) and Nicolas BARLA (SuperGrid Institute)"
+% Script for the generation of unavailabilities seriesfor N-1 outages including HVDC assets
+
+% Uncomment (and update) the following 4 lines to run this script directly with Octave
+% n_series = 2;
+% n_hours = 3;
+% work_dir = "c:\\Users\\n.barla\\Documents\\Local_codes\\HVDCWISE_TEA.jl\\studies\\study_2";
+% previous_work_dir = "c:\\Users\\n.barla\\Documents\\Local_codes\\HVDCWISE_TEA.jl\\studies\\study_1";
+
+
 clc
-close all
-if length(who) > 2
-    clear(setdiff(who, {'n_hours', 'work_dir'}){:});  % clear all variables except work_dir and n_hours
+vars_to_delete = setdiff(who, {'n_hours', 'n_series', 'previous_work_dir', 'work_dir'});
+if length(vars_to_delete) > 0
+    clear(vars_to_delete{:});  % clear all variables except the expected ones
 endif
 
+pkg load statistics
 format long
 
 addpath(fileparts(mfilename('fullpath')));
 
 %%% Retrieve input data
 assert(exist('work_dir', 'var') == 1, "work_dir is not defined")
+assert(exist('previous_work_dir', 'var') == 1, "previous_work_dir is not defined")
+assert(exist('n_series', 'var') == 1, "n_series is not defined")
 assert(exist('n_hours', 'var') == 1, "n_hours is not defined")
+if ~isnumeric(n_series)
+    n_series = str2num(n_series);
+endif
 if ~isnumeric(n_hours)
     n_hours = str2num(n_hours);
 endif
@@ -20,9 +35,9 @@ endif
 reliability_data = read_reliability_data(work_dir);
 
 mpc = reliability_data.mpc;
-n_series = reliability_data.n_series;
 
 folderout = reliability_data.output_folder;
+confirm_recursive_rmdir(0);
 if isfolder(folderout)
     rmdir(folderout, 's');  % 's' to also delete all subfolders and files
 endif
@@ -37,115 +52,144 @@ MTTFbrs_dc = reliability_data.MTTFbrs_dc;
 MTTRsconv_dc = reliability_data.MTTRsconv_dc;
 MTTFsconv_dc = reliability_data.MTTFsconv_dc;
 
-corr_dcpoles_adequacy = reliability_data.corr_dcpoles_adequacy;
-DCdependent_adequacy = reliability_data.DCdependent_adequacy;
-corr_dcpoles_resilience = reliability_data.corr_dcpoles_resilience;
+correlation_poles_conv = reliability_data.correlation_poles.Converter_ACDC;
+correlation_poles_dc_ohl = reliability_data.correlation_poles.DC_OHL;
+correlation_poles_dc_cable = reliability_data.correlation_poles.DC_cable;
+branchdc_types = reliability_data.branchdc_types;
 
-idexdc = reliability_data.idexdc;
-poli = reliability_data.poli;
+branchdc_id_per_pole = reliability_data.branchdc_id_per_pole;  % branchdc indexes (1 value per pole P/N/R)
+pole_ids = reliability_data.pole_ids;  % 1 value per pole per branchdc: 0=R, 1=P, 2=N
 
-%%% START - GENERATION of N-1 and HVDC unavailabilities
+% Initialization
+old_n_series = 0;
+old_n_hours = 0;
+old_n_branch = 0;
+old_n_branchdc = 0;
+old_n_gen = 0;
+old_n_conv = 0;
+
+if isfolder(previous_work_dir)
+    % Read number of series and components per type
+
+    old_availability_series_dir = [previous_work_dir, '\simulation_interface\Input_series\Availability'];
+
+    first_folder = [old_availability_series_dir filesep 'YR_1'];
+    assert(isfolder(first_folder), strcat('Folder YR_1 is missing in ', old_availability_series_dir))
+
+    old_n_hours = size(csvread([first_folder, '\branch\br_status.csv']), 1) - 1;  % First row is for component ids
+
+    old_n_branch = size(csvread([first_folder, '\branch\br_status.csv']), 2);
+    old_n_branchdc = size(csvread([first_folder, '\branchdc\status_p.csv']), 2);
+    old_n_gen = size(csvread([first_folder, '\gen\gen_status.csv']), 2);
+    old_n_conv = size(csvread([first_folder, '\convdc\status_p.csv']), 2);
+
+    % folder_list = ls(old_availability_series_dir);
+    old_folders = dir(old_availability_series_dir);
+    old_folders(1:2) = [];
+    old_n_series = length(old_folders);
+
+    % old_n_series = size(folder_list, 1);
+    for s=1:old_n_series
+        expected_folder_name = strcat("YR_", num2str(s));
+        assert(
+            any(strcmp({old_folders.name}, expected_folder_name)),
+            strcat('There are ', old_n_series, ' folders in ', old_availability_series_dir, '. Folder ', expected_folder_name, ' is missing.', old_folders.name)
+            )
+    endfor
+
+else
+    assert(length(previous_work_dir) == 0, strcat('The provided previous_work_dir does not exist ', previous_work_dir))
+    disp('No previous work dir provided')
+endif
+
+n_h = min(n_hours, old_n_hours);
+n_s = min(n_series, old_n_series);
+
+%%% START - GENERATION of unavailabilities (considering normal events)
 
 A=[];BV=[];
-clear Uacline Uacgen  Udcconv_p Udcconv_n
+clear Uacline Uacgen Udcconv_p Udcconv_n
 
-Udcline_r = ones(size(mpc.branchdc,1),n_hours*n_series);
-Udcline_p = ones(size(mpc.branchdc,1),n_hours*n_series);
-Udcline_n = ones(size(mpc.branchdc,1),n_hours*n_series);
-Uacline = ones(size(mpc.branch,1),n_hours*n_series);
-Uacgen = ones(size(mpc.gen,1),n_hours*n_series);
-Udcconv_p = ones(size(mpc.convdc,1),n_hours*n_series);
-Udcconv_n = ones(size(mpc.convdc,1),n_hours*n_series);
+Uacgen = ones(n_hours*n_series, size(mpc.gen,1));
+Udcline_r = ones(n_hours*n_series, size(mpc.branchdc,1));
+Udcline_p = ones(n_hours*n_series, size(mpc.branchdc,1));
+Udcline_n = ones(n_hours*n_series, size(mpc.branchdc,1));
+Uacline = ones(n_hours*n_series, size(mpc.branch,1));
+Udcconv_p = ones(n_hours*n_series, size(mpc.convdc,1));
+Udcconv_n = ones(n_hours*n_series, size(mpc.convdc,1));
 
 % AC  branches
-for ibr = 1:size(mpc.branch,1)
-    iyr=1;dt=1;in=1;
-    while in < n_series
-        r=rand;
-        if Uacline(ibr,iyr)==1
-            dt=ceil(-MTTFbrs_ac(ibr)*log(r));
-            t1r = iyr+dt-1;
-            t2r = iyr+dt;
-            % iyr = t2r;
-            if t2r< n_hours*n_series
-                Uacline(ibr,iyr:t1r)=1;
-                Uacline(ibr,t2r)=0;
-                in = floor(t2r/n_hours);
-                iyr=t2r;
-            else
-                Uacline(ibr,iyr:n_hours*n_series)=1;
-                in=n_series;
-            end
+n_branch = size(mpc.branch,1);
+for branch_id = 1:n_branch  % branch id
+    t_ref = 1;
+    while t_ref <= n_hours*n_series
+        r = rand;  % Random number between 0 & 1
+        if Uacline(t_ref, branch_id) == 1  % Available
+            TTF = ceil(-MTTFbrs_ac(branch_id)*log(r));  % Time to failure. Probability density function (TTF=t) = exp(-t/MTTF)
+            t1 = min(t_ref + TTF - 1, n_hours*n_series);  % Availabiliy ends
+            Uacline(t_ref:t1, branch_id) = 1;
         else
-            dt=ceil(-MTTRbrs_ac(ibr)*log(r));
-            t1r = iyr+dt-1;
-            t2r = iyr+dt;
-            % iyr = t2r;
-            if t2r< n_hours*n_series
-                Uacline(ibr,iyr:t1r)=0;
-                Uacline(ibr,t2r)=1;
-                in =floor(t2r/n_hours);
-                iyr=t2r;
-            else
-                Uacline(ibr,iyr:n_hours*n_series)=0;
-                in=n_series;
-            end
+            TTR = ceil(-MTTRbrs_ac(branch_id)*log(r));  % Time to repair
+            t1 = min(t_ref + TTR - 1, n_hours*n_series);  % Unavailabiliy ends
+            Uacline(t_ref:t1, branch_id) = 0;
         end
+        t_ref = t1 + 1;  % (Un)Availabiliy starts
     end
 end
-for i = 1:n_series
-    Uaclines{i} = Uacline(:,1+(i-1)*n_hours:n_hours*i);
+for s = 1:n_series
+    Uaclines{s} = Uacline(1+(s-1)*n_hours:n_hours*s, :);
 end
-% DC branches
-for dcbr = 1:size(mpc.branchdc,1)
-    quali_poli = poli(find(idexdc==dcbr));
-    idxs = find(idexdc==dcbr);
-    iyr=1;dt=1;in=1;
-    while in < n_series
-        if DCdependent_adequacy == 1
-            r = rand;
-            for ipol = 1:length(quali_poli)
-                if quali_poli(ipol)==0
-                    try
-                    Status_ini(ipol) = Udcline_r(dcbr,iyr) ;
-                    catch err
-                        keyboard
-                    end
-                    if  Status_ini(ipol)
-                        transition_rate(ipol) = 1/MTTFbrs_dc(idxs(ipol));
-                        trans_tipo(ipol)=0;
-                    else
-                        transition_rate(ipol) = 1/MTTRbrs_dc(idxs(ipol));
-                        trans_tipo(ipol)=1;
-                    end
+n_comp = min(n_branch, old_n_branch);
+if n_s * n_h * n_comp > 0
+    for s = 1:n_s
+        old_folder = [old_availability_series_dir filesep strcat('YR_', num2str(s))];
+        old_file = [old_folder, '\branch\br_status.csv'];
+        old_data = csvread(old_file);
+        assert(old_data(1, 1:n_comp) == 1:n_comp, strcat('Component ids in ', old_file, ' should be ', num2str(1:n_comp), ' not ', num2str(old_data(1, 1:n_comp))));
+        Uaclines{s}(1:n_h, 1:n_comp) = old_data(2:n_h+1, 1:n_comp);  % First row is for component ids
+    endfor
+endif
 
-                elseif quali_poli(ipol)==1
-                    try
-                        Status_ini(ipol) = Udcline_p(dcbr,iyr) ;
-                    catch err
-                        keyboard
-                    end
-                    if Status_ini(ipol)
-                        transition_rate(ipol) = 1/MTTFbrs_dc(idxs(ipol));
-                        trans_tipo(ipol)=0;
-                    else
-                        transition_rate(ipol) = 1/MTTRbrs_dc(idxs(ipol));
-                        trans_tipo(ipol)=1;
-                    end
-                else
-                    Status_ini(ipol) = Udcline_n(dcbr,iyr) ;
-                    if Status_ini(ipol)
-                        transition_rate(ipol) = 1/MTTFbrs_dc(idxs(ipol));
-                        trans_tipo(ipol)=0;
-                    else
-                        transition_rate(ipol) = 1/MTTRbrs_dc(idxs(ipol));
-                        trans_tipo(ipol)=1;
-                    end
-                end
+% DC branches
+n_branchdc = size(mpc.branchdc,1);
+for branchdc_id = 1:n_branchdc
+    branchdc_type = branchdc_types{branchdc_id};
+    if strcmp(branchdc_type, 'DC cable')
+        correlation = correlation_poles_dc_cable;
+    else
+        assert(strcmp(branchdc_type, 'DC OHL'), strcat('branchdc_type should be "DC cable" or "DC OHL", not ', branchdc_type))
+        correlation = correlation_poles_dc_ohl;
+    endif
+    idxs = find(branchdc_id_per_pole == branchdc_id);
+    used_poles = pole_ids(idxs);
+    t_ref = 1;
+    while t_ref <= n_hours*n_series
+        r = rand;
+
+        for ipol = 1:length(used_poles)
+            if used_poles(ipol) == 0  % Metallic return
+                Status_ini(ipol) = Udcline_r(t_ref, branchdc_id);  % Initial status
+            elseif used_poles(ipol) == 1  % Pole P
+                Status_ini(ipol) = Udcline_p(t_ref, branchdc_id);
+            else  % Pole N
+                Status_ini(ipol) = Udcline_n(t_ref, branchdc_id);
+            endif
+
+            if  Status_ini(ipol)  % Pole is available
+                transition_rate(ipol) = 1/MTTFbrs_dc(idxs(ipol));  % Failure rate (per hour)
+                trans_tipo(ipol)=0;  % Transition type (0 = to failure)
+            else  % Pole is unavailable
+                transition_rate(ipol) = 1/MTTRbrs_dc(idxs(ipol));  % Repair rate (per hour)
+                trans_tipo(ipol) = 1;  % Transition type (1 = to repair)
             end
-            transitio = [];Vs = [];
-            for k = 0:length(quali_poli)
-                v = nchoosek([1:length(quali_poli)], k);
+        endfor
+
+        if correlation > 0  % Correlation between pole failures
+
+            transitio = [];
+            Vs = [];
+            for k = 0:length(used_poles)
+                v = nchoosek([1:length(used_poles)], k);
                 for iv = 1:size(v,1)
                     Vs = [Vs; Status_ini];
                     Vs(end,v(iv,:))=not((Status_ini(v(iv,:))));
@@ -155,42 +199,28 @@ for dcbr = 1:size(mpc.branchdc,1)
                     AB = [a;b];
                     dummy = 0;
                     quali_compl = (Vs(end,:)-Status_ini==0)*2+(abs(Vs(end,:)-Status_ini)>0)*1;
-                    if length(quali_poli) ==3
-                        CORRE = eye(length(quali_poli) );
-                        idxf = find(Status_ini==1);
-                        for i1 = 1:length(idxf)-1
-                            for i2 = i1+1:length(idxf)
-                                CORRE(idxf(i1),idxf(i2)) = corr_dcpoles_adequacy;
-                                CORRE(idxf(i2),idxf(i1)) = corr_dcpoles_adequacy;
-                            end
+
+                    correlation_matrix = eye(length(used_poles));  % Correlation between poles
+                    idxf = find(Status_ini==1);
+                    for i1 = 1:length(idxf)-1
+                        for i2 = i1+1:length(idxf)
+                            correlation_matrix(idxf(i1),idxf(i2)) = correlation;
+                            correlation_matrix(idxf(i2),idxf(i1)) = correlation;
                         end
+                    end
 
-                        for in1 = 1:quali_compl(1)
-                            for in2 = 1:quali_compl(2)
+                    for in1 = 1:quali_compl(1)
+                        for in2 = 1:quali_compl(2)
+                            if length(used_poles) == 3
                                 for in3 = 1:quali_compl(3)
-
                                     Vx = [in1 in2 in3];
                                     Vss = (abs(Vs(end,:)-Status_ini)==0)*2+(abs(Vs(end,:)-Status_ini)>0)*1;
-
-                                    dummy = dummy + ((-1).^(sum(abs(Vss-Vx)))).*copulacdf('gaussian',[AB(in1,1) AB(in2,2) AB(in3,3)],CORRE);
+                                    dummy = dummy + ((-1).^(sum(abs(Vss-Vx)))).*copulacdf('gaussian',[AB(in1,1) AB(in2,2) AB(in3,3)], correlation_matrix);
                                 end
-                            end
-                        end
-                    else
-                        CORRE = eye(length(quali_poli) );
-                        CORRE = eye(length(quali_poli) );
-                        idxf = find(Status_ini==1);
-                        for i1 = 1:length(idxf)-1
-                            for i2 = i1+1:length(idxf)
-                                CORRE(idxf(i1),idxf(i2)) = corr_dcpoles_adequacy;
-                                CORRE(idxf(i2),idxf(i1)) = corr_dcpoles_adequacy;
-                            end
-                        end
-                        for in1 = 1:quali_compl(1)
-                            for in2 = 1:quali_compl(2)
+                            else
                                 Vx = [in1 in2 ];
                                 Vss = (abs(Vs(end,:)-Status_ini)==0)*2+(abs(Vs(end,:)-Status_ini)>0)*1;
-                                dummy = dummy + ((-1).^(sum(abs(Vss-Vx)))).*copulacdf('gaussian',[AB(in1,1) AB(in2,2)],CORRE);
+                                dummy = dummy + ((-1).^(sum(abs(Vss-Vx)))).*copulacdf('gaussian',[AB(in1,1) AB(in2,2)], correlation_matrix);
                             end
                         end
                     end
@@ -201,7 +231,7 @@ for dcbr = 1:size(mpc.branchdc,1)
             transitio(iqualeini) = [];
             Vs(iqualeini,:)=[];
 
-            dt=ceil(-1/sum(transitio)*log(1-r));
+            TT = ceil(-1/sum(transitio)*log(1-r));  % Transition time
             rd = rand;
 
             transition_ = transitio./sum(transitio);
@@ -212,368 +242,211 @@ for dcbr = 1:size(mpc.branchdc,1)
 
             dquali = Vs(qualeTran,:) - Status_ini;
 
-            t1r = iyr+dt-1;
-            t2r = t1r+1;
-
             dummytrans0 = find(not(dquali == 0));
 
             for idum = 1:length(dummytrans0)
                 ipol = dummytrans0(idum);
-                switch quali_poli(ipol)
+                t1 = min(t_ref + TT - 1, n_hours*n_series);  % (Un)Availabiliy ends
+                switch used_poles(ipol)
                     case 0
-                        if trans_tipo(ipol)==0
-
-                            if t2r< n_hours*n_series
-                                Udcline_r(dcbr,iyr:t1r)=1;
-                                Udcline_r(dcbr,t2r)=0;
-                                in =floor(t2r/n_hours);
-                                iyr=t2r;
-                            else
-                                Udcline_r(dcbr,iyr:n_hours*n_series)=1;
-                                in=n_series;
-                            end
+                        if trans_tipo(ipol) == 0  % Transition type (0 = to failure)
+                            Udcline_r(t_ref:t1, branchdc_id) = 1;
                         else
-                            if t2r< n_hours*n_series
-                                Udcline_r(dcbr,iyr:t1r)=0;
-                                Udcline_r(dcbr,t2r)=1;
-                                in =floor(t2r/n_hours);
-                                iyr=t2r;
-                            else
-                                Udcline_r(dcbr,iyr:n_hours*n_series)=0;
-                                in=n_series;
-                            end
+                            Udcline_r(t_ref:t1, branchdc_id) = 0;
                         end
                     case 1
-                        if trans_tipo(ipol)==0
-
-                            if t2r< n_hours*n_series
-                                Udcline_p(dcbr,iyr:t1r)=1;
-                                Udcline_p(dcbr,t2r)=0;
-                                in =floor(t2r/n_hours);
-                                iyr=t2r;
-                            else
-                                Udcline_p(dcbr,iyr:n_hours*n_series)=1;
-                                in=n_series;
-                            end
+                        if trans_tipo(ipol) == 0
+                            Udcline_p(t_ref:t1, branchdc_id) = 1;
                         else
-                            if t2r< n_hours*n_series
-                                Udcline_p(dcbr,iyr:t1r)=0;
-                                Udcline_p(dcbr,t2r)=1;
-                                in =floor(t2r/n_hours);
-                                iyr=t2r;
-                            else
-                                Udcline_p(dcbr,iyr:n_hours*n_series)=0;
-                                in=n_series;
-                            end
+                            Udcline_p(t_ref:t1, branchdc_id) = 0;
                         end
                     case 2
-                        if trans_tipo(ipol)==0
-
-                            if t2r< n_hours*n_series
-                                Udcline_n(dcbr,iyr:t1r)=1;
-                                Udcline_n(dcbr,t2r)=0;
-                                in =floor(t2r/n_hours);
-                                iyr=t2r;
-                            else
-                                Udcline_n(dcbr,iyr:n_hours*n_series)=1;
-                                in=n_series;
-                            end
+                        if trans_tipo(ipol) == 0
+                            Udcline_n(t_ref:t1, branchdc_id) = 1;
                         else
-                            if t2r< n_hours*n_series
-                                Udcline_n(dcbr,iyr:t1r)=0;
-                                Udcline_n(dcbr,t2r)=1;
-                                in =floor(t2r/n_hours);
-                                iyr=t2r;
-                            else
-                                Udcline_n(dcbr,iyr:n_hours*n_series)=0;
-                                in=n_series;
-                            end
+                            Udcline_n(t_ref:t1, branchdc_id) = 0;
                         end
                 end
+                t_ref = t1 + 1;  % (Un)Availability starts
             end
             clear transition_rate Status_ini Vs transitio
 
-        else
-            r=rand;
-            for ipol = 1:length(quali_poli)
-                if quali_poli(ipol)==0
-                    Status_ini(ipol) = Udcline_r(dcbr,iyr) ;
-                    if Status_ini(ipol)
-                        transition_rate(ipol) = 1/MTTFbrs_dc(idxs(ipol));
-                        trans_tipo(ipol)=0;
-                    else
-                        transition_rate(ipol) = 1/MTTRbrs_dc(idxs(ipol));
-                        trans_tipo(ipol)=1;
-                    end
+        else  % No correlation between pole failures
 
-                elseif quali_poli(ipol)==1
-                    Status_ini(ipol) = Udcline_p(dcbr,iyr) ;
-                    if Status_ini(ipol)
-                        transition_rate(ipol) = 1/MTTFbrs_dc(idxs(ipol));
-                        trans_tipo(ipol)=0;
-                    else
-                        transition_rate(ipol) = 1/MTTRbrs_dc(idxs(ipol));
-                        trans_tipo(ipol)=1;
-                    end
-                else
-                    Status_ini(ipol) = Udcline_n(dcbr,iyr) ;
-                    if Status_ini(ipol)
-                        transition_rate(ipol) = 1/MTTFbrs_dc(idxs(ipol));
-                        trans_tipo(ipol)=0;
-                    else
-                        transition_rate(ipol) = 1/MTTRbrs_dc(idxs(ipol));
-                        trans_tipo(ipol)=1;
-                    end
-                end
-            end
-            dt=ceil(-1/sum(transition_rate)*log(1-r));
+            TT = ceil(-1/sum(transition_rate)*log(r));
             rd = rand;
 
             transition_rate = transition_rate./sum(transition_rate);
 
             idx = find(cumsum(transition_rate) > rd);
 
-            t1r = iyr+dt-1;
-            t2r = t1r+1;
-
             ipol = idx(1);
-            switch quali_poli(ipol)
-                case 0
-                    if trans_tipo(ipol)==0
 
-                        if t2r< n_hours*n_series
-                            Udcline_r(dcbr,iyr:t1r)=1;
-                            Udcline_r(dcbr,t2r)=0;
-                            in =floor(t2r/n_hours);
-                            iyr=t2r;
-                        else
-                            Udcline_r(dcbr,iyr:n_hours*n_series)=1;
-                            in=n_series;
-                        end
+            t1 = min(t_ref + TT - 1, n_hours*n_series);  % Availabiliy ends
+            switch used_poles(ipol)
+                case 0
+                    if trans_tipo(ipol) == 0  % Transition type (0 = to failure)
+                        Udcline_r(t_ref:t1, branchdc_id) = 1;
                     else
-                        if t2r< n_hours*n_series
-                            Udcline_r(dcbr,iyr:t1r)=0;
-                            Udcline_r(dcbr,t2r)=1;
-                            in =floor(t2r/n_hours);
-                            iyr=t2r;
-                        else
-                            Udcline_r(dcbr,iyr:n_hours*n_series)=0;
-                            in=n_series;
-                        end
+                        Udcline_r(t_ref:t1, branchdc_id) = 0;
                     end
                 case 1
-                    if trans_tipo(ipol)==0
-                        if t2r< n_hours*n_series
-                            Udcline_p(dcbr,iyr:t1r)=1;
-                            Udcline_p(dcbr,t2r)=0;
-                            in =floor(t2r/n_hours);
-                            iyr=t2r;
-                        else
-                            Udcline_p(dcbr,iyr:n_hours*n_series)=1;
-                            in=n_series;
-                        end
+                    if trans_tipo(ipol) == 0
+                        Udcline_p(t_ref:t1, branchdc_id) = 1;
                     else
-                        if t2r< n_hours*n_series
-                            Udcline_p(dcbr,iyr:t1r)=0;
-                            Udcline_p(dcbr,t2r)=1;
-                            in =floor(t2r/n_hours);
-                            iyr=t2r;
-                        else
-                            Udcline_p(dcbr,iyr:n_hours*n_series)=0;
-                            in=n_series;
-                        end
+                        Udcline_p(t_ref:t1, branchdc_id) = 0;
                     end
                 case 2
-                    if trans_tipo(ipol)==0
-                        if t2r< n_hours*n_series
-                            Udcline_n(dcbr,iyr:t1r)=1;
-                            Udcline_n(dcbr,t2r)=0;
-                            in =floor(t2r/n_hours);
-                            iyr=t2r;
-                        else
-                            Udcline_n(dcbr,iyr:n_hours*n_series)=1;
-                            in=n_series;
-                        end
+                    if trans_tipo(ipol) == 0
+                        Udcline_n(t_ref:t1, branchdc_id) = 1;
                     else
-                        if t2r< n_hours*n_series
-                            Udcline_n(dcbr,iyr:t1r)=0;
-                            Udcline_n(dcbr,t2r)=1;
-                            in =floor(t2r/n_hours);
-                            iyr=t2r;
-                        else
-                            Udcline_n(dcbr,iyr:n_hours*n_series)=0;
-                            in=n_series;
-                        end
+                        Udcline_n(t_ref:t1, branchdc_id) = 0;
                     end
             end
+            t_ref = t1 + 1;  % Unavailability starts
             clear transition_rate Status_ini
-        end
+        endif
     end
-end
+endfor
 
-for i = 1:n_series
-    Udclines_n{i} = Udcline_n(:,1+(i-1)*n_hours:n_hours*i);
-    Udclines_r{i} = Udcline_r(:,1+(i-1)*n_hours:n_hours*i);
-    Udclines_p{i} = Udcline_p(:,1+(i-1)*n_hours:n_hours*i);
+for s = 1:n_series
+    Udclines_r{s} = Udcline_r(1+(s-1)*n_hours:n_hours*s, :);
+    Udclines_p{s} = Udcline_p(1+(s-1)*n_hours:n_hours*s, :);
+    Udclines_n{s} = Udcline_n(1+(s-1)*n_hours:n_hours*s, :);
 end
+n_comp = min(n_branchdc, old_n_branchdc);
+if n_s * n_h * n_comp > 0
+    for s = 1:n_s
+        old_folder = [old_availability_series_dir filesep strcat('YR_', num2str(s))];
+        old_file_r = [old_folder, '\branchdc\status_r.csv'];
+        old_file_p = [old_folder, '\branchdc\status_p.csv'];
+        old_file_n = [old_folder, '\branchdc\status_n.csv'];
+        old_data_r = csvread(old_file_r);
+        old_data_p = csvread(old_file_p);
+        old_data_n = csvread(old_file_n);
+        assert(old_data_r(1, 1:n_comp) == 1:n_comp, strcat('Component ids in', old_file_r, ' should be ', num2str(1:n_comp), ' not ', num2str(old_data_r(1, 1:n_comp))));
+        assert(old_data_p(1, 1:n_comp) == 1:n_comp, strcat('Component ids in', old_file_p, ' should be ', num2str(1:n_comp), ' not ', num2str(old_data_p(1, 1:n_comp))));
+        assert(old_data_n(1, 1:n_comp) == 1:n_comp, strcat('Component ids in', old_file_n, ' should be ', num2str(1:n_comp), ' not ', num2str(old_data_n(1, 1:n_comp))));
+        Udclines_r{s}(1:n_h, 1:n_comp) = old_data_r(2:n_h+1, 1:n_comp);
+        Udclines_p{s}(1:n_h, 1:n_comp) = old_data_p(2:n_h+1, 1:n_comp);
+        Udclines_n{s}(1:n_h, 1:n_comp) = old_data_n(2:n_h+1, 1:n_comp);
+    endfor
+endif
+
 % AC Gens
-for ibr = 1:size(mpc.gen,1)
-    iyr=1;dt=1;in=1;
-    while in < n_series
-        r=rand;
-        if Uacgen(ibr,iyr)==1
-            dt=ceil(-MTTFsgen_ac(ibr)*log(r));
-            t1r = iyr+dt-1;
-            t2r = iyr+dt;
-            if t2r< n_hours*n_series
-                Uacgen(ibr,iyr:t1r)=1;
-                Uacgen(ibr,t2r)=0;
-                in =floor(t2r/n_hours);
-                iyr=t2r;
-            else
-                Uacgen(ibr,iyr:n_hours*n_series)=1;
-                in=n_series;
-            end
+n_gen = size(mpc.gen,1);
+for gen_id = 1:n_gen
+    t_ref = 1;
+    while t_ref <= n_hours*n_series
+        r = rand;  % Random number between 0 & 1
+        if Uacgen(t_ref, gen_id) == 1  % Available
+            TTF = ceil(-MTTFsgen_ac(gen_id)*log(r));  % Time to failure. Probability density function (TTF=t) = exp(-t/MTTF)
+            t1 = min(t_ref + TTF - 1, n_hours*n_series);  % Availabiliy ends
+            Uacgen(t_ref:t1, gen_id) = 1;
         else
-            dt = ceil(-MTTRsgen_ac(ibr)*log(r));
-            t1r = iyr+dt-1;
-            t2r = iyr+dt;
-            if t2r< n_hours*n_series
-                Uacgen(ibr,iyr:t1r)=0;
-                Uacgen(ibr,t2r)=1;
-                in = floor(t2r/n_hours);
-                iyr = t2r;
-            else
-                Uacgen(ibr,iyr:n_hours*n_series)=0;
-                in = n_series;
-            end
+            TTR = ceil(-MTTRsgen_ac(gen_id)*log(r));  % Time to repair
+            t1 = min(t_ref + TTR - 1, n_hours*n_series);  % Unavailabiliy ends
+            Uacgen(t_ref:t1, gen_id) = 0;
         end
+        t_ref = t1 + 1;  % (Un)Availabiliy starts
     end
 end
 for i = 1:n_series
-    Uacgens{i} = Uacgen(:,1+(i-1)*n_hours:n_hours*i);
+    Uacgens{i} = Uacgen(1+(i-1)*n_hours:n_hours*i, :);
 end
+n_comp = min(n_gen, old_n_gen);
+if n_s * n_h * n_comp > 0
+    for s = 1:n_s
+        old_folder = [old_availability_series_dir filesep strcat('YR_', num2str(s))];
+        old_file = [old_folder, '\gen\gen_status.csv'];
+        old_data = csvread(old_file);
+        assert(old_data(1, 1:n_comp) == 1:n_comp, strcat('Component ids in', old_file, ' should be ', num2str(1:n_comp), ' not ', num2str(old_data(1, 1:n_comp))));
+        Uacgens{s}(1:n_h, 1:n_comp) = old_data(2:n_h+1, 1:n_comp);
+    endfor
+endif
+
 % DC converters
-if DCdependent_adequacy == 0
-    for ibr = 1:size(Udcconv_p,1)
-        iyr=1;dt=1;in =1;
-        while in < n_series
+n_conv = size(mpc.convdc,1);
+if correlation_poles_conv == 0  % No correlation between pole failures
+    for conv_id = 1:size(Udcconv_p,2)  % Positive poles
+        t_ref = 1;
+        while t_ref <= n_hours*n_series
             r = rand;
-            if Udcconv_p(ibr,iyr)==1
-                dt=ceil(-MTTFsconv_dc(ibr)*log(r));
-                t1r = iyr+dt-1;
-                t2r = iyr+dt;
-
-                if t2r < n_hours*n_series
-                    Udcconv_p(ibr,iyr:t1r)=1;
-                    Udcconv_p(ibr,t2r)=0;
-                    in = floor(t2r/n_hours);
-                    iyr = t2r;
-                else
-                    Udcconv_p(ibr,iyr:n_hours*n_series)=1;
-                    in = n_series;
-                end
+            if Udcconv_p(t_ref, conv_id) == 1
+                TTF = ceil(-MTTFsconv_dc(conv_id)*log(r));  % Time to failure. Probability density function (TTF=t) = exp(-t/MTTF)
+                t1 = min(t_ref + TTF - 1, n_hours*n_series);  % Availabiliy ends
+                Udcconv_p(t_ref:t1, conv_id) = 1;
             else
-                dt = ceil(-MTTRsconv_dc(ibr)*log(r));
-                t1r = iyr+dt-1;
-                t2r = iyr+dt;
-                if t2r < n_hours*n_series
-                    Udcconv_p(ibr,iyr:t1r)=0;
-                    Udcconv_p(ibr,t2r)=1;
-                    in = floor(t2r/n_hours);
-                    iyr = t2r;
-                else
-                    Udcconv_p(ibr,iyr:n_hours*n_series) = 0;
-                    in = n_series;
-                end
+                TTR = ceil(-MTTRsconv_dc(conv_id)*log(r));  % Time to repair
+                t1 = min(t_ref + TTR - 1, n_hours*n_series);  % Unavailabiliy ends
+                Udcconv_p(t_ref:t1, conv_id) = 0;
             end
+            t_ref = t1 + 1;  % (Un)Availabiliy starts
+        end
+    end
+    for conv_id = 1:size(Udcconv_n,2)  % Negative poles
+        t_ref = 1;
+        while t_ref <= n_hours*n_series
+            r = rand;
+            if Udcconv_n(t_ref, conv_id) == 1
+                TTF = ceil(-MTTFsconv_dc(conv_id)*log(r));  % Time to failure. Probability density function (TTF=t) = exp(-t/MTTF)
+                t1 = min(t_ref + TTF - 1, n_hours*n_series);  % Availabiliy ends
+                Udcconv_n(t_ref:t1, conv_id) = 1;
+            else
+                TTR = ceil(-MTTRsconv_dc(conv_id)*log(r));  % Time to repair
+                t1 = min(t_ref + TTR - 1, n_hours*n_series);  % Unavailabiliy ends
+                Udcconv_n(t_ref:t1, conv_id) = 0;
+            end
+            t_ref = t1 + 1;  % (Un)Availabiliy starts
         end
     end
 
-    for ibr = 1:size(Udcconv_n,1)
-        iyr=1;dt=1;in =1;
-        while in < n_series
+else  % Correlation between pole failures
+    for conv_id = 1:n_conv
+        t_ref = 1;
+        while t_ref <= n_hours*n_series
+            used_poles = [1 2];
             r = rand;
-            if Udcconv_n(ibr,iyr) == 1
-                dt = ceil(-MTTFsconv_dc(ibr)*log(r));
-                t1r = iyr+dt-1;
-                t2r = iyr+dt;
 
-                if t2r< n_hours*n_series
-                    Udcconv_n(ibr,iyr:t1r)=1;
-                    Udcconv_n(ibr,t2r)=0;
-                    in = floor(t2r/n_hours);
-                    iyr = t2r;
-                else
-                    Udcconv_n(ibr,iyr:n_hours*n_series)=1;
-                    in=n_series;
-                end
+            for pole_id = 1:length(used_poles)
+                if used_poles(pole_id) == 1  % Pole P
+                    Status_ini(pole_id) = Udcline_p(branchdc_id, t_ref);
+                else  % Pole N
+                    Status_ini(pole_id) = Udcline_n(branchdc_id, t_ref);
+                endif
 
-            else
-                dt = ceil(-MTTRsconv_dc(ibr)*log(r));
-                t1r = iyr+dt-1;
-                t2r = iyr+dt;
-                if t2r < n_hours*n_series
-                    Udcconv_n(ibr,iyr:t1r)=0;
-                    Udcconv_n(ibr,t2r)=1;
-                    in = floor(t2r/n_hours);
-                    iyr = t2r;
-                else
-                    Udcconv_n(ibr,iyr:n_hours*n_series) = 0;
-                    in = n_series;
+                if  Status_ini(pole_id)  % Pole is available
+                    transition_rate(pole_id) = 1/MTTFsconv_dc(conv_id);  % Failure rate (per hour)
+                    trans_tipo(pole_id)=0;  % Transition type (0 = to failure)
+                else  % Pole is unavailable
+                    transition_rate(pole_id) = 1/MTTRsconv_dc(conv_id);  % Repair rate (per hour)
+                    trans_tipo(pole_id) = 1;  % Transition type (1 = to repair)
                 end
-            end
-        end
-    end
-else
-    for dcbr = 1:size(mpc.convdc,1)
-        iyr=1;dt=1;in=1;
-        while in < n_series
-            quali_conv = [1 2 ];
-            r = rand;
-            for ipol = 1:length(quali_conv)
-                if quali_poli(ipol)==1
-                    StatusC_ini(ipol) = Udcconv_p(dcbr,iyr) ;
-                    if StatusC_ini(ipol)
-                        transition_rate(ipol) = 1/MTTFsconv_dc(dcbr);
-                        trans_tipo(ipol)=0;
-                    else
-                        transition_rate(ipol) = 1/MTTRsconv_dc(dcbr);
-                        trans_tipo(ipol)=1;
-                    end
-                else
-                    StatusC_ini(ipol) = Udcconv_n(dcbr,iyr) ;
-                    if StatusC_ini(ipol)
-                        transition_rate(ipol) = 1/MTTFsconv_dc(dcbr);
-                        trans_tipo(ipol)=0;
-                    else
-                        transition_rate(ipol) = 1/MTTRsconv_dc((dcbr));
-                        trans_tipo(ipol)=1;
-                    end
-                end
-            end
-            transitio = [];Vs = [];
+            endfor
 
-            for k = 0:length(quali_conv)
-                v = nchoosek([1:length(quali_conv)], k);
+            transitio = [];
+            Vs = [];
+
+            for k = 0:length(used_poles)
+                v = nchoosek([1:length(used_poles)], k);
 
                 for iv = 1:size(v,1)
                     Vs = [Vs; Status_ini];
-                    Vs(end,v(iv,:))=not((StatusC_ini(v(iv,:))));
+                    Vs(end,v(iv,:))=not((Status_ini(v(iv,:))));
 
                     a = [transition_rate];
                     b = [ones(1,length(transition_rate))];
                     AB = [a;b];
                     dummy = 0;
-                    quali_compl = (Vs(end,:)-StatusC_ini==0)*2+(abs(Vs(end,:)-StatusC_ini)>0)*1;
+                    quali_compl = (Vs(end,:)-Status_ini==0)*2+(abs(Vs(end,:)-Status_ini)>0)*1;
 
-                    CORRE = eye(length(quali_conv) );
-                    CORRE = eye(length(quali_poli) );
+                    correlation = eye(length(quali_conv) );
+                    correlation = eye(length(used_poles) );
                     idxf = find(StatusC_ini==1);
                     for i1 = 1:length(idxf)-1
                         for i2 = i1+1:length(idxf)
-                            CORRE(idxf(i1),idxf(i2)) = corr_dcpoles_adequacy;
-                            CORRE(idxf(i2),idxf(i1)) = corr_dcpoles_adequacy;
+                            correlation(idxf(i1),idxf(i2)) = correlation_poles_conv;
+                            correlation(idxf(i2),idxf(i1)) = correlation_poles_conv;
                         end
                     end
                     for in1 = 1:quali_compl(1)
@@ -590,7 +463,7 @@ else
             transitio(iqualeini) = [];
             Vs(iqualeini,:)=[];
 
-            dt=ceil(-1/sum(transitio)*log(1-r));
+            TT = ceil(-1/sum(transitio)*log(1-r));  % Transition time
             rd = rand;
 
             transition_ = transitio./sum(transitio);
@@ -599,92 +472,74 @@ else
 
             qualeTran = idx(1);
 
-            dquali = Vs(qualeTran,:) - StatusC_ini;
-            t1r = iyr+dt-1;
-            t2r = t1r+1;
+            dquali = Vs(qualeTran,:) - Status_ini;
 
             dummytrans0 = find(not(dquali == 0));
 
             for idum = 1:length(dummytrans0)
-                ipol = dummytrans0(idum);
-                switch quali_poli(ipol)
+                pole_id = dummytrans0(idum);
+                t1 = min(t_ref + TT - 1, n_hours*n_series);  % (Un)Availabiliy ends
+                switch used_poles(pole_id)
                     case 1
-                        if trans_tipo(ipol)==0
-                            if t2r< n_hours*n_series
-                                Udcconv_p(dcbr,iyr:t1r)=1;
-                                Udcconv_p(dcbr,t2r)=0;
-                                in =floor(t2r/n_hours);
-                                iyr=t2r;
-                            else
-                                Udcconv_p(dcbr,iyr:n_hours*n_series)=1;
-                                in=n_series;
-                            end
+                        if trans_tipo(pole_id) == 0
+                            Udcconv_p(t_ref:t1, conv_id) = 1;
                         else
-                            if t2r< n_hours*n_series
-                                Udcconv_p(dcbr,iyr:t1r)=0;
-                                Udcconv_p(dcbr,t2r)=1;
-                                in =floor(t2r/n_hours);
-                                iyr=t2r;
-                            else
-                                Udcconv_p(dcbr,iyr:n_hours*n_series)=0;
-                                in=n_series;
-                            end
+                            Udcconv_p(t_ref:t1, conv_id) = 0;
                         end
                     case 2
-                        if trans_tipo(ipol)==0
-                            if t2r< n_hours*n_series
-                                Udcconv_n(dcbr,iyr:t1r)=1;
-                                Udcconv_n(dcbr,t2r)=0;
-                                in =floor(t2r/n_hours);
-                                iyr=t2r;
-                            else
-                                Udcconv_n(dcbr,iyr:n_hours*n_series)=1;
-                                in=n_series;
-                            end
+                        if trans_tipo(pole_id) == 0
+                            Udcconv_n(t_ref:t1, conv_id) = 1;
                         else
-                            if t2r< n_hours*n_series
-                                Udcconv_n(dcbr,iyr:t1r)=0;
-                                Udcconv_n(dcbr,t2r)=1;
-                                in =floor(t2r/n_hours);
-                                iyr=t2r;
-                            else
-                                Udcconv_n(dcbr,iyr:n_hours*n_series)=0;
-                                in=n_series;
-                            end
+                            Udcconv_n(t_ref:t1, conv_id) = 0;
                         end
                 end
+                t_ref = t1 + 1;  % (Un)Availability starts
             end
-            clear transition_rate StatusC_ini Vs transitio
+            clear transition_rate Status_ini Vs transitio
+            t_ref = t1 + 1;  % (Un)Availabiliy starts
         end
     end
 end
-for i = 1:n_series
-    Udcconvs_n{i} = Udcconv_n(:,1+(i-1)*n_hours:n_hours*i);
-    Udcconvs_p{i} = Udcconv_p(:,1+(i-1)*n_hours:n_hours*i);
+for s = 1:n_series
+    Udcconvs_n{i} = Udcconv_n(1+(s-1)*n_hours:n_hours*s, :);
+    Udcconvs_p{i} = Udcconv_p(1+(s-1)*n_hours:n_hours*s, :);
 end
+n_comp = min(n_conv, old_n_conv);
+if n_s * n_h * n_comp > 0
+    for s = 1:n_s
+        old_folder = [old_availability_series_dir filesep strcat('YR_', num2str(s))];
+        old_file_p = [old_folder, '\convdc\status_p.csv'];
+        old_file_n = [old_folder, '\convdc\status_n.csv'];
+        old_data_p = csvread(old_file_p);
+        old_data_n = csvread(old_file_n);
+        assert(old_data_p(1, 1:n_comp) == 1:n_comp, strcat('Component ids in', old_file_p, ' should be ', num2str(1:n_comp), ' not ', num2str(old_data_p(1, 1:n_comp))));
+        assert(old_data_n(1, 1:n_comp) == 1:n_comp, strcat('Component ids in', old_file_n, ' should be ', num2str(1:n_comp), ' not ', num2str(old_data_n(1, 1:n_comp))));
+        Udclines_p{s}(1:n_h, 1:n_comp) = old_data_p(2:n_h+1, 1:n_comp);
+        Udclines_n{s}(1:n_h, 1:n_comp) = old_data_n(2:n_h+1, 1:n_comp);
+    endfor
+endif
 
 
 %%% PRINT CSV FILES FOR CSV TREE STRUCTURE
 
-for in = 1:n_series
-    % folderctgout = [root_path '\' folderout filesep 'YR_' num2str(in)];
-    folderctgout = [folderout filesep 'YR_' num2str(in)];
+for i = 1:n_series
+    folderctgout = [folderout filesep 'YR_' num2str(i)];
 
     mkdir(folderctgout);
     mkdir([folderctgout filesep 'branch'])
-    csvwrite([folderctgout filesep 'branch' filesep 'br_status.csv'],[[1:size(mpc.branch,1)];Uaclines{in}']);
+    csvwrite([folderctgout filesep 'branch' filesep 'br_status.csv'],[[1:size(mpc.branch,1)];Uaclines{i}]);
     mkdir([folderctgout filesep 'gen'])
-    csvwrite([folderctgout filesep 'gen' filesep 'gen_status.csv'],[[1:size(mpc.gen,1)];Uacgens{in}']);
+    csvwrite([folderctgout filesep 'gen' filesep 'gen_status.csv'],[[1:size(mpc.gen,1)];Uacgens{i}]);
     mkdir([folderctgout filesep 'branchdc'])
-    Udcbr_r{in}=Udclines_r{in}(idexdc(find(poli==0)),1:n_hours);
-    csvwrite([folderctgout filesep 'branchdc' filesep 'status_r.csv'],[[idexdc(find(poli==0))];Udcbr_r{in}'])
-    Udcbr_p{in}=Udclines_p{in}(idexdc(find(poli==1)),1:n_hours);
-    csvwrite([folderctgout filesep 'branchdc' filesep 'status_p.csv'],[[idexdc(find(poli==1))];Udcbr_p{in}'])
-    Udcbr_n{in}=Udclines_n{in}(idexdc(find(poli==2)),1:n_hours);
-    csvwrite([folderctgout filesep 'branchdc' filesep 'status_n.csv'],[[idexdc(find(poli==2))];Udcbr_n{in}'])
+    Udcbr_r{i}=Udclines_r{i}(1:n_hours, branchdc_id_per_pole(find(pole_ids==0)));
+    csvwrite([folderctgout filesep 'branchdc' filesep 'status_r.csv'],[[branchdc_id_per_pole(find(pole_ids==0))];Udcbr_r{i}])
+    Udcbr_p{i}=Udclines_p{i}(1:n_hours, branchdc_id_per_pole(find(pole_ids==1)));
+    csvwrite([folderctgout filesep 'branchdc' filesep 'status_p.csv'],[[branchdc_id_per_pole(find(pole_ids==1))];Udcbr_p{i}])
+    Udcbr_n{i}=Udclines_n{i}(1:n_hours, branchdc_id_per_pole(find(pole_ids==2)));
+    csvwrite([folderctgout filesep 'branchdc' filesep 'status_n.csv'],[[branchdc_id_per_pole(find(pole_ids==2))];Udcbr_n{i}])
     mkdir([folderctgout filesep 'convdc'])
-    csvwrite([folderctgout filesep 'convdc' filesep 'status_p.csv'],[[1:size(mpc.convdc,1)];Udcconvs_p{in}']);
-    csvwrite([folderctgout filesep 'convdc' filesep 'status_n.csv'],[[1:size(mpc.convdc,1)];Udcconvs_n{in}']);
+    csvwrite([folderctgout filesep 'convdc' filesep 'status_p.csv'],[[1:size(mpc.convdc,1)];Udcconvs_p{i}]);
+    csvwrite([folderctgout filesep 'convdc' filesep 'status_n.csv'],[[1:size(mpc.convdc,1)];Udcconvs_n{i}]);
 end
 
 warning on
