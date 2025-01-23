@@ -501,8 +501,8 @@ else  % Correlation between pole failures
     end
 end
 for s = 1:n_series
-    Udcconvs_n{i} = Udcconv_n(1+(s-1)*n_hours:n_hours*s, :);
-    Udcconvs_p{i} = Udcconv_p(1+(s-1)*n_hours:n_hours*s, :);
+    Udcconvs_n{s} = Udcconv_n(1+(s-1)*n_hours:n_hours*s, :);
+    Udcconvs_p{s} = Udcconv_p(1+(s-1)*n_hours:n_hours*s, :);
 end
 n_comp = min(n_conv, old_n_conv);
 if n_s * n_h * n_comp > 0

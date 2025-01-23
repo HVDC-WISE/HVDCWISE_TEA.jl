@@ -30,9 +30,9 @@ function solver_data(solver)
     return Dict("optimizer" => optimizer, "setting" => setting)
 end
 
-function compute_time(work_dir::String, hours_per_subsimulation::Int, base_MVA::Int, optimizer, setting, matlab_octave_path::String)
+function compute_time(work_dir::String, hours_per_subsimulation::Int, base_MVA::Int, optimizer, setting, octave_path::String)
     t1 = time()
-    run_study(work_dir, subperiod, 100, optimizer, setting, matlab_octave_path)
+    run_study(work_dir, subperiod, 100, optimizer, setting, octave_path)
     seconds = trunc(Int, time()-t1)
     minutes = trunc(Int, seconds / 60)
     println("Simulation $(basename(work_dir)) finished in $seconds s ($minutes mn)")
@@ -83,17 +83,17 @@ optimizer = solver["optimizer"]
 setting = solver["setting"]
 
 # Verify that Matlab or Octave is installed
-matlab_octave_path = detect_matlab_or_octave()  # You can replace this line by the path of your Matlab/Octave launcher. for example: "C:/Users/n.barla/AppData/Local/Programs/GNU Octave/Octave-9.2.0/octave-launch.exe"
+octave_path = detect_octave()  # You can replace this line by the path of your Matlab/Octave launcher. for example: "C:/Users/n.barla/AppData/Local/Programs/GNU Octave/Octave-9.2.0/octave-launch.exe"
 
 # Run the study
-@time run_study(work_dir, hours_per_subsimulation, base_MVA, optimizer, setting, matlab_octave_path)
+@time run_study(work_dir, hours_per_subsimulation, base_MVA, optimizer, setting, octave_path)
 
 #=
 println("Julia initialization time: $(trunc(Int, time()-t0)) s")
 for fifo in readdir(main_dir)
     work_dir = joinpath(main_dir, fifo)
     if isdir(work_dir)
-        compute_time(work_dir, hours_per_subsimulation, base_MVA, optimizer, setting, matlab_octave_path)
+        compute_time(work_dir, hours_per_subsimulation, base_MVA, optimizer, setting, octave_path)
     end
 end
 =#

@@ -3,13 +3,13 @@ using CSV
 import DataFrames
 using XLSX
 
-function build_simulation_inputs(work_dir::String, previous_work_dir, n_availability_series, base_mva::Int, matlab_octave_path::String)
+function build_simulation_inputs(work_dir::String, previous_work_dir, n_availability_series, base_mva::Int, octave_path::String)
     model_data = build_grid_model(work_dir, base_mva)
     power_series_info = build_power_series(work_dir, base_mva, model_data)
     n_power_series = power_series_info["n_series"]  # Not used
     n_hours = power_series_info["n_hours"]
 
-    build_availability_series(work_dir, previous_work_dir, n_availability_series, n_hours, matlab_octave_path::String)
+    build_availability_series(work_dir, previous_work_dir, n_availability_series, n_hours, octave_path::String)
 end
 
 function base_to_pu(value::Float64, unit::String, base_mva::Int, base_kv::Int)
@@ -616,9 +616,9 @@ function build_power_series(work_dir::String, base_mva::Int, model_data::Dict)
     return Dict("n_series" => length(micro_scenarios), "n_hours" => n_hours)
 end
 
-function build_availability_series(work_dir::String, previous_work_dir, n_series, n_hours::Int, matlab_octave_path::String)
-    matlab_tools_path = joinpath(dirname(@__DIR__), "matlab_tools")
+function build_availability_series(work_dir::String, previous_work_dir, n_series, n_hours::Int, octave_path::String)
+    octave_tools_path = joinpath(dirname(@__DIR__), "octave_tools")
     println("Building availability series")
     kwargs = Dict("work_dir" => work_dir, "previous_work_dir" => previous_work_dir, "n_series" => n_series, "n_hours" => n_hours)
-    run_matlab_script(joinpath(matlab_tools_path, "build_availability_series.m"), matlab_octave_path, kwargs)
+    run_octave_script(joinpath(octave_tools_path, "build_availability_series.m"), octave_path, kwargs)
 end

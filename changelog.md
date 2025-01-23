@@ -15,6 +15,8 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Changed
 - Reliability data template
 - Refactor build_availability_series.m
+### Deprecated
+- Remove mentions to Matlab: HVDCWISE_TEA is only compatible with Octave
 ### Fix
 - Right line lengths considered in availability series generation
 

@@ -1,17 +1,17 @@
-function run_study(work_dir::String, previous_work_dir, n_availability_series, hours::Int, base_mva::Int, optimizer, setting, matlab_octave_path::String)
+function run_study(work_dir::String, previous_work_dir, n_availability_series, hours::Int, base_mva::Int, optimizer, setting, octave_path::String)
     simulation_dir = joinpath(work_dir, "simulation_interface")
     if isdir(simulation_dir)
         rm(simulation_dir, recursive=true)
     end
 
     println("Build simulation inputs")
-    build_simulation_inputs(work_dir, previous_work_dir, n_availability_series, base_mva, matlab_octave_path)
+    build_simulation_inputs(work_dir, previous_work_dir, n_availability_series, base_mva, octave_path)
 
     println("Run simulation")
     run_simulation(work_dir, hours, optimizer, setting)
 
     println("Run results post-processing")
-    build_user_results(work_dir, base_mva, matlab_octave_path)
+    build_user_results(work_dir, base_mva, octave_path)
 
     println("Study finished")
 end

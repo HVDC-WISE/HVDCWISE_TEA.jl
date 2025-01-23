@@ -58,7 +58,7 @@ include("io/parse.jl")
 include("io/scenario.jl")
 include("io/run_study.jl")
 
-include("matlab_tools/run_matlab.jl")
+include("octave_tools/run_octave.jl")
 
 include("parallel/base.jl")
 

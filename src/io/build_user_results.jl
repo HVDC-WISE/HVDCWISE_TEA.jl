@@ -4,7 +4,7 @@ import JSON
 import XLSX
 
 
-function build_user_results(work_dir::String, base_mva::Int, matlab_octave_path::String)
+function build_user_results(work_dir::String, base_mva::Int, octave_path::String)
     # Identify simulation results directory
     simulation_dir = joinpath(work_dir, "simulation_interface")
     macro_scenario = ""
@@ -31,8 +31,8 @@ function build_user_results(work_dir::String, base_mva::Int, matlab_octave_path:
     # Build user results (Matlab code)
     println("Computing KPIs")
     kwargs = Dict("work_dir" => work_dir)
-    matlab_tools_path = joinpath(dirname(@__DIR__), "matlab_tools")
-    run_matlab_script(joinpath(matlab_tools_path, "compute_KPIs.m"), matlab_octave_path, kwargs)
+    octave_tools_path = joinpath(dirname(@__DIR__), "octave_tools")
+    run_octave_script(joinpath(octave_tools_path, "compute_KPIs.m"), octave_path, kwargs)
 end
 
 

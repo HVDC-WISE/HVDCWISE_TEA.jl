@@ -31,7 +31,7 @@ optimizer = HVDCWISE_TEA.optimizer_with_attributes(HiGHS.Optimizer, setting_opt.
 setting = Dict("output" => Dict("branch_flows" => true, "duals" =>false), "conv_losses_mp" => false);
 
 # Verify that Matlab or Octave is installed
-matlab_octave_path = HVDCWISE_TEA.detect_matlab_or_octave()  # You can replace this line by the path of your Matlab/Octave launcher. For example: "C:/Users/n.barla/AppData/Local/Programs/GNU Octave/Octave-9.2.0/octave-launch.exe"
+octave_path = HVDCWISE_TEA.detect_octave()  # You can replace this line by the path of your Octave launcher. For example: "C:/Users/n.barla/AppData/Local/Programs/GNU Octave/Octave-9.2.0/octave-launch.exe"
 
 # Run the study
-@time HVDCWISE_TEA.run_study(work_dir, previous_work_dir, n_availability_series, hours_per_subsimulation, base_MVA, optimizer, setting, matlab_octave_path)
+@time HVDCWISE_TEA.run_study(work_dir, previous_work_dir, n_availability_series, hours_per_subsimulation, base_MVA, optimizer, setting, octave_path)
