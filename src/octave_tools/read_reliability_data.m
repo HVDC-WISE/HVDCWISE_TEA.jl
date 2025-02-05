@@ -100,15 +100,22 @@ function reliability_data = read_reliability_data(work_dir)
     [~, ~, branchdc_sheet] = xlsread(macro_data_path, 'branchdc');
     assert(branchdc_sheet{1,5} == "type", strcat("Cell E1 in sheet branch in ", macro_data_path, " should be type, not ", branchdc_sheet{1,5}))
     assert(branchdc_sheet{1,6} == "length", strcat("Cell F1 in sheet branch in ", macro_data_path, " should be type, not ", branchdc_sheet{1,6}))
-    branchdc_lengths = branchdc_sheet{4:3+size(mpc.branchdc,1),6};  % km
+
+    has_dc_bus = ismember("busdc", fieldnames(mpc));
+    has_dc_branch = ismember("branchdc", fieldnames(mpc));
+    has_dc_converters = ismember("convdc", fieldnames(mpc));
+    assert(has_dc_bus==has_dc_branch && has_dc_bus==has_dc_converters)
+    has_dc = has_dc_bus;
 
     % Giving names to buses AC and DC
     for j = 1:size(mpc.bus,1)
         mpc.bus_name{j} = ['AC-' num2str(mpc.bus(j,1))];
     end
-    for j = 1:size(mpc.busdc,1)
-        mpc.busdc_name{j} = ['DC-' num2str(mpc.busdc(j,1))];
-    end
+    if has_dc
+      for j = 1:size(mpc.busdc,1)
+          mpc.busdc_name{j} = ['DC-' num2str(mpc.busdc(j,1))];
+      endfor
+    endif
 
     mpc0 = mpc;
     % Correspondence between wires N,R,P and DC branches id & type & length
@@ -119,36 +126,38 @@ function reliability_data = read_reliability_data(work_dir)
     branchdc_type_per_pole = [];  % 1 for DC cable, 2 for DC OHL
     dc_type_cable = 1;
     dc_type_ohl = 2;
-    for i = 1:size(mpc0.branchdc,1)
-        dc_length = branchdc_sheet{3+i,6};
-        branchdc_type = branchdc_sheet{3+i,5};
-        branchdc_types{i} = branchdc_type;
-        if strcmp(branchdc_type, "DC cable")
-            dc_type = dc_type_cable;
-        else
-            assert(strcmp(branchdc_type, "DC OHL"), strcat("Type for DC branch ", i, " should be 'DC cable' or 'DC OHL', not ", branchdc_type))
-            dc_type = dc_type_ohl;
-        endif
-        if mpc0.branchdc(i,10)==2  % Column 10 is line_confi (1=monopolar, 2=bipolar)
-            for pole_id = 1:3
-                branchdc_lengths_per_pole = [branchdc_lengths_per_pole, dc_length];
-                branchdc_type_per_pole = [branchdc_type_per_pole, dc_type];
-                branchdc_id_per_pole = [branchdc_id_per_pole i];
-                pole_ids=[pole_ids pole_id-1];
-            end
-        else  % Monopolar branchdc
-            used_poles = find(mpc.branchdc(i,14:16)==1);  % 14=status_p, 15=status_n, 16=status_r
-            for pole_id = 1:length(used_poles)
-                branchdc_lengths_per_pole = [branchdc_lengths_per_pole, dc_length];
-                branchdc_type_per_pole = [branchdc_type_per_pole, dc_type];
-                branchdc_id_per_pole = [branchdc_id_per_pole i];
-                switch used_poles(pole_id)
-                    case 1
-                        pole_ids=[pole_ids 1];
-                    case 2
-                        pole_ids=[pole_ids 2];
-                    case 3
-                        pole_ids=[pole_ids 0];
+    if has_dc
+        for i = 1:size(mpc0.branchdc,1)
+            dc_length = branchdc_sheet{3+i,6};
+            branchdc_type = branchdc_sheet{3+i,5};
+            branchdc_types{i} = branchdc_type;
+            if strcmp(branchdc_type, "DC cable")
+                dc_type = dc_type_cable;
+            else
+                assert(strcmp(branchdc_type, "DC OHL"), strcat("Type for DC branch ", i, " should be 'DC cable' or 'DC OHL', not ", branchdc_type))
+                dc_type = dc_type_ohl;
+            endif
+            if mpc0.branchdc(i,10)==2  % Column 10 is line_confi (1=monopolar, 2=bipolar)
+                for pole_id = 1:3
+                    branchdc_lengths_per_pole = [branchdc_lengths_per_pole, dc_length];
+                    branchdc_type_per_pole = [branchdc_type_per_pole, dc_type];
+                    branchdc_id_per_pole = [branchdc_id_per_pole i];
+                    pole_ids=[pole_ids pole_id-1];
+                end
+            else  % Monopolar branchdc
+                used_poles = find(mpc.branchdc(i,14:16)==1);  % 14=status_p, 15=status_n, 16=status_r
+                for pole_id = 1:length(used_poles)
+                    branchdc_lengths_per_pole = [branchdc_lengths_per_pole, dc_length];
+                    branchdc_type_per_pole = [branchdc_type_per_pole, dc_type];
+                    branchdc_id_per_pole = [branchdc_id_per_pole i];
+                    switch used_poles(pole_id)
+                        case 1
+                            pole_ids=[pole_ids 1];
+                        case 2
+                            pole_ids=[pole_ids 2];
+                        case 3
+                            pole_ids=[pole_ids 0];
+                    end
                 end
             end
         end
@@ -188,9 +197,10 @@ function reliability_data = read_reliability_data(work_dir)
     MTTFbrs_ac(transfo_ids) = input_data.Transformer.MTTR*(1/input_data.Transformer.FOR - 1);
 
     % Converter
-    MTTRsconv_dc = ones(1,size(mpc.convdc,1)).*input_data.Converter_ACDC.MTTR;
-    MTTFsconv_dc = MTTRsconv_dc.*(1/input_data.Converter_ACDC.FOR - 1);
-
+    if has_dc
+        MTTRsconv_dc = ones(1,size(mpc.convdc,1)).*input_data.Converter_ACDC.MTTR;
+        MTTFsconv_dc = MTTRsconv_dc.*(1/input_data.Converter_ACDC.FOR - 1);
+    end
     % AC OHL
     MTTRbrs_ac(ac_ohl_ids) = input_data.AC_OHL.MTTR;
     MTTFbrs_ac(ac_ohl_ids) = 8760./(ac_ohl_lengths(ac_ohl_ids).*input_data.AC_OHL.failurerate_perkm + input_data.AC_OHL.failurerate_0);
@@ -206,6 +216,7 @@ function reliability_data = read_reliability_data(work_dir)
     % Data to return
     reliability_data.mpc = mpc;
     reliability_data.output_folder = output_folder;
+    reliability_data.has_dc = has_dc;
 
     reliability_data.MTTRsgen_ac = MTTRsgen_ac;
     reliability_data.MTTFsgen_ac = MTTFsgen_ac;
@@ -213,15 +224,29 @@ function reliability_data = read_reliability_data(work_dir)
     reliability_data.MTTFbrs_ac = MTTFbrs_ac;
     reliability_data.MTTRbrs_ac = MTTRbrs_ac;
 
-    reliability_data.MTTRbrs_dc = MTTRbrs_dc;
-    reliability_data.MTTFbrs_dc = MTTFbrs_dc;
+    if has_dc
+      reliability_data.MTTRbrs_dc = MTTRbrs_dc;
+      reliability_data.MTTFbrs_dc = MTTFbrs_dc;
 
-    reliability_data.MTTRsconv_dc = MTTRsconv_dc;
-    reliability_data.MTTFsconv_dc = MTTFsconv_dc;
+      reliability_data.MTTRsconv_dc = MTTRsconv_dc;
+      reliability_data.MTTFsconv_dc = MTTFsconv_dc;
 
-    reliability_data.branchdc_types = branchdc_types;
-    reliability_data.correlation_poles = correlation_poles;
+      reliability_data.branchdc_types = branchdc_types;
+      reliability_data.correlation_poles = correlation_poles;
 
-    reliability_data.branchdc_id_per_pole = branchdc_id_per_pole;
-    reliability_data.pole_ids = pole_ids;
+      reliability_data.branchdc_id_per_pole = branchdc_id_per_pole;
+      reliability_data.pole_ids = pole_ids;
+    else
+      reliability_data.MTTRbrs_dc = NaN;
+      reliability_data.MTTFbrs_dc = NaN;
+
+      reliability_data.MTTRsconv_dc = NaN;
+      reliability_data.MTTFsconv_dc = NaN;
+
+      reliability_data.branchdc_types = NaN;
+      reliability_data.correlation_poles = correlation_poles;
+
+      reliability_data.branchdc_id_per_pole = NaN;
+      reliability_data.pole_ids = NaN;
+    end
 end
