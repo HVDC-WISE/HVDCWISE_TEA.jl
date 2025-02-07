@@ -54,12 +54,12 @@ function build_grid_model(work_dir::String, base_mva::Int)
     for file_name in readdir(user_inputs_dir)
         if occursin("_model.xlsx", file_name)
             @assert (macro_scenario == "")  "2 files could contain the grid model data: $macro_scenario" * "_model.xlsx and $file_name. Please delete or rename the wrong file."
-            macro_scenario_raw = file_name[1:length(file_name)-11]
-            macro_scenario = replace(macro_scenario_raw, " " => "_")
+            macro_scenario = file_name[1:length(file_name)-11]
+            @assert (!occursin(macro_scenario, " "))  "The file name of your '_model.xlsx' file should not contain any space. $file_name"
         end
     end
     @assert (macro_scenario != "") "The file containing the grid model data should end with '_model.xlsx'. This file has not been found in $user_inputs_dir."
-    model_path = joinpath(user_inputs_dir, "$macro_scenario_raw"*"_model.xlsx")
+    model_path = joinpath(user_inputs_dir, "$macro_scenario"*"_model.xlsx")
     @assert isfile(model_path)  "$model_path is not a file"
 
     costs_path = joinpath(user_inputs_dir, "costs_data.xlsx")
@@ -102,8 +102,8 @@ function build_grid_model(work_dir::String, base_mva::Int)
     model_attributes = Dict(
         "bus" => ["base voltage"],
         "busdc" => ["base voltage"], 
-        "branch" => ["from bus id",  "to bus id", "type", "length", "power rating", "resistance", "reactance"], 
-        "branchdc" => ["from bus id",  "to bus id", "type", "length", "configuration", "power rating", "resistance"], 
+        "branch" => ["from bus id",  "to bus id", "type", "length", "power rating", "resistance", "reactance", "number of lines"], 
+        "branchdc" => ["from bus id",  "to bus id", "type", "length", "configuration", "power rating", "resistance"],
         "convdc" => ["AC bus id",  "DC bus id", "type", "configuration", "power rating"],
         "gen" => ["bus id", "type", "power rating"], 
         "gen_res" => ["bus id", "type", "power rating"], 
@@ -127,7 +127,7 @@ function build_grid_model(work_dir::String, base_mva::Int)
             @assert (Set([string(comp_sheet[i,j]) for i in 4:n_rows for j in length(model_attributes[comp_name])+3:n_cols]) == Set(["missing"]))  "Columns > $(length(model_attributes[comp_name])+3) in $model_path sheet $comp_sheet should be empty.\n$(Set([string(comp_sheet[i,j]) for i in 4:n_rows for j in length(model_attributes[comp_name])+3:n_cols]))"
             n_cols = length(model_attributes[comp_name]) + 2
         end
-        @assert [comp_sheet[1,j] for j in 3:n_cols] == model_attributes[comp_name] "$model_path sheet $comp_name B3:end3 is $([comp_sheet[1,j] for j in 2:4]) instead of $(model_attributes[comp_name])"
+        @assert [comp_sheet[1,j] for j in 3:n_cols] == model_attributes[comp_name] "$model_path sheet $comp_name B3:end3 is $([comp_sheet[1,j] for j in 3:n_cols]) instead of $(model_attributes[comp_name])"
         for j in 2:n_cols
             model_units[comp_name][comp_sheet[1,j]] = comp_sheet[2,j]
         end
