@@ -81,6 +81,8 @@ function gather_opf_results(work_dir::String, macro_scenario::String, base_mva::
                             opf_results[micro_scenario_name][component][attribute] = Dict()
                             # Read csv
                             csv_data = CSV.File(attribute_file, delim=',') |> DataFrames.DataFrame
+                            # Remove columns with only NaN
+                            csv_data = csv_data[!, map(value->!all(isnan, value), eachcol(csv_data))]
                             n_hours = first(size(csv_data))
                             n_rows = XLSX.get_dimension(comp_sheet).stop.row_number
 
