@@ -171,6 +171,7 @@ function reliability_data = read_reliability_data(work_dir)
     ac_type_ohl = 1;
     ac_type_transformer = 2;
     ac_ohl_lengths = [];  % Length (in km) of each AC OHL
+    branch_n_parallel = [];  % Number of real lines per model (aggregated) line
 
     for i=1:size(mpc.branch,1)
         branch_type = branch_sheet{3+i,5};
@@ -181,6 +182,7 @@ function reliability_data = read_reliability_data(work_dir)
             assert(strcmp(branch_type, "Transformer"), strcat("Type for AC branch ", i, " should be 'AC OHL' or 'Transformer', not ", branch_type))
             ac_type = ac_type_transformer;
         endif
+        branch_n_parallel = [branch_n_parallel, branch_sheet{3+i,10}];
         branch_types = [branch_types, ac_type];
     endfor
     ac_ohl_ids = find(branch_types == ac_type_ohl);
@@ -223,6 +225,7 @@ function reliability_data = read_reliability_data(work_dir)
 
     reliability_data.MTTFbrs_ac = MTTFbrs_ac;
     reliability_data.MTTRbrs_ac = MTTRbrs_ac;
+    reliability_data.branch_n_parallel = branch_n_parallel;
 
     if has_dc
       reliability_data.MTTRbrs_dc = MTTRbrs_dc;

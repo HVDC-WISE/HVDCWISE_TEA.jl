@@ -17,7 +17,7 @@ work_dir = joinpath(main_dir, "studies\\study_2")  # Folder 'studies' is ignored
 previous_work_dir = joinpath(main_dir, "studies\\study_1")
 
 # Number of contingency time series to generated. N_microscenarios = n_availability_series * N_power_series
-n_availability_series = 2
+n_availability_series = 1
 
 # The yearly problem is split into subproblems of this size (1 week is 168h, 1 month is 720h, 1 year is 8760h)
 hours_per_subsimulation = 168
@@ -28,7 +28,7 @@ base_MVA = 100
 ## Solver parameters
 setting_opt = Dict("presolve" => "on", "solver" => "ipm", "run_crossover" => "off", "ipm_iteration_limit" => 3000, "time_limit" => 3600.0, "output_flag" => false)
 optimizer = HVDCWISE_TEA.optimizer_with_attributes(HiGHS.Optimizer, setting_opt...)
-setting = Dict("output" => Dict("branch_flows" => true, "duals" =>false), "conv_losses_mp" => false);
+setting = Dict("output" => Dict("branch_flows" => true, "duals" => false), "conv_losses_mp" => false);
 
 # Verify that Matlab or Octave is installed
 octave_path = HVDCWISE_TEA.detect_octave()  # You can replace this line by the path of your Octave launcher. For example: "C:/Users/n.barla/AppData/Local/Programs/GNU Octave/Octave-9.2.0/octave-launch.exe"

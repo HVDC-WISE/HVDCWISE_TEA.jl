@@ -9,6 +9,10 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [add_tests] - 2025-02-07
+### Added
+- Number of parallel lines in AC branches
+
 ## [add_tests] - 2025-01-23
 ### Added
 - Length in Macro-scenario template
