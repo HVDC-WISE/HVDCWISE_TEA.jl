@@ -32,3 +32,10 @@ output/
 # VS Code files
 .vscode/
 *.code-workspace
+
+# draft folder
+draft/
+test/data/test_size
+
+# folder for studies
+studies/

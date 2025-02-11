@@ -12,14 +12,14 @@ function ref_add_flex_load!(ref::Dict{Symbol,<:Any}, data::Dict{String,<:Any})
 
     # Compute the total energy demand of each flex load and store it in the first hour nw
     if haskey(data, "dim")
-        for nw in nw_ids(data; hour = 1)
+        for nw in _FP.nw_ids(data; hour = 1)
             if haskey(ref[:it][_PM.pm_it_sym][:nw][nw], :time_elapsed)
                 time_elapsed = ref[:it][_PM.pm_it_sym][:nw][nw][:time_elapsed]
             else
                 Memento.warn(_LOGGER, "network data should specify time_elapsed, using 1.0 as a default")
                 time_elapsed = 1.0
             end
-            timeseries_nw_ids = similar_ids(data, nw, hour = 1:dim_length(data,:hour))
+            timeseries_nw_ids = _FP.similar_ids(data, nw, hour = 1:_FP.dim_length(data,:hour))
             for (l, load) in ref[:it][_PM.pm_it_sym][:nw][nw][:flex_load]
                 # `ref` instead of `data` must be used to access loads, since the former has
                 # already been filtered to remove inactive loads.

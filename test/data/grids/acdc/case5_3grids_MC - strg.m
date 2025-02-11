@@ -40,12 +40,6 @@ mpc.gen = [
    11 40  0  300 -300 1      100      1  300   10;
 ];
 
-%% non-dispatchable generators
-%column_names% gen_bus   pref   qmax   qmin gen_status cost_gen cost_curt
-mpc.ndgen = [
-                     7    0.0  101.0  -10.0          1      0.0    1000.0;
-];
-
 %% generator cost
 % 1 startup shutdown n x1 y1 ... xn yn
 % 2 startup shutdown n c(n-1) ... c0
@@ -55,6 +49,18 @@ mpc.gencost = [
   2       0        0 2 2.0 0;
   2       0        0 2 5   0;
   2       0        0 2 7   0;
+];
+
+%% storage data
+% storage_bus   ps   qs energy energy_rating charge_rating discharge_rating charge_efficiency discharge_efficiency thermal_rating  qmin qmax    r    x p_loss q_loss status
+mpc.storage = [
+            11  0.0  0.0  10.0         500.0         100.0            100.0               0.9                  0.9          200.0  -1.0  1.0  0.0  0.0    0.0    0.0      1;
+];
+
+%% storage additional data
+%column_names% max_energy_absorption stationary_energy_inflow stationary_energy_outflow self_discharge_rate
+mpc.storage_extra = [
+                                 0.0                      0.0                       0.0                1e-3;
 ];
 
 %% AC branch
