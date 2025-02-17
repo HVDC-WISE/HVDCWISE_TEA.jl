@@ -30,8 +30,8 @@ setting_opt = Dict("presolve" => "on", "solver" => "ipm", "run_crossover" => "of
 optimizer = HVDCWISE_TEA.optimizer_with_attributes(HiGHS.Optimizer, setting_opt...)
 setting = Dict("output" => Dict("branch_flows" => true, "duals" => false), "conv_losses_mp" => false);
 
-# Verify that Matlab or Octave is installed
-octave_path = HVDCWISE_TEA.detect_octave()  # You can replace this line by the path of your Octave launcher. For example: "C:/Users/n.barla/AppData/Local/Programs/GNU Octave/Octave-9.2.0/octave-launch.exe"
+# Verify that Matlab or Octave is installed. Matlab and the "Statistics and Machine Learning Toolbox" are required if you want to consider correlations between pole failures in DC components.
+octave_path = HVDCWISE_TEA.detect_octave()  # You can replace this line by the path of your Octave or Matlab launcher. For example: "C:/Users/n.barla/AppData/Local/Programs/GNU Octave/Octave-9.2.0/octave-launch.exe"
 
 # Run the study
 @time HVDCWISE_TEA.run_study(work_dir, previous_work_dir, n_availability_series, hours_per_subsimulation, base_MVA, optimizer, setting, octave_path)

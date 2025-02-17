@@ -1,20 +1,21 @@
-function reliability_data = read_reliability_data(work_dir)
-    % addpath(fileparts(mfilename('fullpath')));
-    pkg load io
+function reliability_data = read_reliability_data(work_dir, is_octave)
+    if is_octave
+        pkg load io
+    end
 
     assert(exist('work_dir', 'var') == 1, "work_dir is not defined")
 
     simulation_dir = [work_dir, '\simulation_interface'];
-    macro_scenario = NaN;
+    macro_scenario = "";
     folders=dir(simulation_dir);
     folders(1:2)=[];
     for i=1:length(folders)
         fifo_name = folders(i).name;
         if fifo_name(end-1:end) == '.m'
             macro_scenario = fifo_name(1:end-2);
-        endif
-    endfor
-    assert(isnan(macro_scenario) == 0, strcat("No .m file has been found in ", simulation_dir))
+        end
+    end
+    assert(length(macro_scenario) > 0, strcat("No .m file has been found in ", simulation_dir))
 
     %%% --- Main user inputs ---
 
@@ -35,7 +36,7 @@ function reliability_data = read_reliability_data(work_dir)
     line_titles = {"Attribute", "Unit", "Description"};
     for i = 1:3
         assert(sheet{i,1} == line_titles{i}, strcat("Cell A", num2str(i), " in ", reliability_data_path, " should be ", line_titles{i}, ", not ", sheet{i,1}))
-    endfor
+    end
 
     attributes = {"Attribute", "MTTR", "FOR", "Failure rate 0", "Failure rate per km", "Correlation between poles"};
     units = {"Unit", "h", "%", "1/y", "1/y/km", "Number between 0 & 1"};
@@ -54,12 +55,12 @@ function reliability_data = read_reliability_data(work_dir)
         assert(sheet{i,1} == comp_name, strcat("Cell A", num2str(i), " in ", reliability_data_path, " should be ", comp_name, ", not ", sheet{i,1}))
         for j = 2:3
             assert(isempty(sheet{i,j}) == 0, strcat("No cell in B", num2str(i), ":C", num2str(i), " in ", reliability_data_path, " should be empty. ", mat2str(sheet{i,2:3})))
-        endfor
+        end
         comp_name = strrep(comp_name, " ", "_");
         input_data.(comp_name) = struct();
         input_data.(comp_name).MTTR = sheet{i,2};
         input_data.(comp_name).FOR = sheet{i,3};
-    endfor
+    end
 
     % Components with a length
     components_linear = {"AC OHL", "DC OHL", "DC cable"};
@@ -69,13 +70,13 @@ function reliability_data = read_reliability_data(work_dir)
         assert(isempty(sheet{i,2}) == 0, strcat("Cell B", num2str(i), " in ", reliability_data_path, " should not be empty. ", mat2str(sheet{i,2})))
         for j = 4:5
             assert(isempty(sheet{i,j}) == 0, strcat("No cell in D", num2str(i), ":E", num2str(i), " in ", reliability_data_path, " should be empty. ", mat2str(sheet{i,4:5})))
-        endfor
+        end
         comp_name = strrep (comp_name, " ", "_");
         input_data.(comp_name) = struct();
         input_data.(comp_name).MTTR = sheet{i,2};
         input_data.(comp_name).failurerate_0 = sheet{i,4};
         input_data.(comp_name).failurerate_perkm = sheet{i,5};
-    endfor
+    end
 
     % DC components (with several poles)
     dc_components = {"Converter ACDC", "DC OHL", "DC cable"};
@@ -85,7 +86,7 @@ function reliability_data = read_reliability_data(work_dir)
         comp_name = strrep(dc_components{i}, " ", "_");
         assert(isempty(sheet{row,6}) == 0, strcat("Cell F", num2str(row), " in ", reliability_data_path, " should not be empty."))
         correlation_poles.(comp_name) = sheet{row,6};
-    endfor
+    end
 
     warning off
 
@@ -114,8 +115,8 @@ function reliability_data = read_reliability_data(work_dir)
     if has_dc
       for j = 1:size(mpc.busdc,1)
           mpc.busdc_name{j} = ['DC-' num2str(mpc.busdc(j,1))];
-      endfor
-    endif
+      end
+    end
 
     mpc0 = mpc;
     % Correspondence between wires N,R,P and DC branches id & type & length
@@ -136,7 +137,7 @@ function reliability_data = read_reliability_data(work_dir)
             else
                 assert(strcmp(branchdc_type, "DC OHL"), strcat("Type for DC branch ", i, " should be 'DC cable' or 'DC OHL', not ", branchdc_type))
                 dc_type = dc_type_ohl;
-            endif
+            end
             if mpc0.branchdc(i,10)==2  % Column 10 is line_confi (1=monopolar, 2=bipolar)
                 for pole_id = 1:3
                     branchdc_lengths_per_pole = [branchdc_lengths_per_pole, dc_length];
@@ -181,10 +182,10 @@ function reliability_data = read_reliability_data(work_dir)
         else
             assert(strcmp(branch_type, "Transformer"), strcat("Type for AC branch ", i, " should be 'AC OHL' or 'Transformer', not ", branch_type))
             ac_type = ac_type_transformer;
-        endif
+        end
         branch_n_parallel = [branch_n_parallel, branch_sheet{3+i,10}];
         branch_types = [branch_types, ac_type];
-    endfor
+    end
     ac_ohl_ids = find(branch_types == ac_type_ohl);
     transfo_ids = find(branch_types == ac_type_transformer);
 
