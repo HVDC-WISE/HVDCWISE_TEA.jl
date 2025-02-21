@@ -2,10 +2,11 @@
 % Script for the generation of unavailabilities seriesfor N-1 outages including HVDC assets
 
 % Uncomment (and update) the following 4 lines to run this script directly with Octave
+% is_octave = 1;
 % n_series = 2;
 % n_hours = 3;
-% work_dir = "c:\\Users\\n.barla\\Documents\\Local_codes\\HVDCWISE_TEA.jl\\studies\\study_2";
-% previous_work_dir = "c:\\Users\\n.barla\\Documents\\Local_codes\\HVDCWISE_TEA.jl\\studies\\study_1";
+% work_dir = 'c:\\Users\\n.barla\\Documents\\Local_codes\\HVDCWISE_TEA.jl\\studies\\study_2';
+% previous_work_dir = 'c:\\Users\\n.barla\\Documents\\Local_codes\\HVDCWISE_TEA.jl\\studies\\study_1';
 
 
 clc
@@ -14,12 +15,6 @@ if length(vars_to_delete) > 0
     clear(vars_to_delete{:});  % clear all variables except the expected ones
 end
 
-# pkg load statistics
-format long
-
-addpath(fileparts(mfilename('fullpath')));
-
-%%% Retrieve input data
 assert(exist('is_octave', 'var') == 1, "is_octave is not defined")  % 1 if Octave, 0 if Matlab
 assert(exist('work_dir', 'var') == 1, "work_dir is not defined")
 assert(exist('previous_work_dir', 'var') == 1, "previous_work_dir is not defined")
@@ -38,6 +33,14 @@ if ~isnumeric(n_hours)
     n_hours = str2num(n_hours);
 end
 
+if is_octave
+	pkg load statistics
+end
+
+format long
+addpath(fileparts(mfilename('fullpath')));
+
+%%% Retrieve input data
 reliability_data = read_reliability_data(work_dir, is_octave);
 
 mpc = reliability_data.mpc;
@@ -296,6 +299,16 @@ if has_dc
                             end
                         end
 
+                        % Verify positive definiteness of the matrix for subsequent computations
+                        while det(correlation_matrix) < 1e-4
+                            M0 = correlation_matrix;
+                            correlation_matrix = closest_corr(M0);
+                        end
+                        correlation_matrix = (correlation_matrix + correlation_matrix')*0.5;
+                        A = eye(size(correlation_matrix, 1));
+                        A = A + (correlation_matrix - diag(diag(correlation_matrix)));
+                        correlation_matrix = A;
+
                         for in1 = 1:quali_compl(1)
                             for in2 = 1:quali_compl(2)
                                 if length(used_poles) == 3
@@ -322,18 +335,15 @@ if has_dc
                 rd = rand;
 
                 transition_ = transitio./sum(transitio);
-
                 idx = find(cumsum(transition_) > rd);
-
                 qualeTran = idx(1);
-
                 dquali = Vs(qualeTran,:) - Status_ini;
-
                 dummytrans0 = find(not(dquali == 0));
+
+				        t1 = min(t_ref + TT - 1, n_hours*n_series);  % (Un)Availabiliy ends
 
                 for idum = 1:length(dummytrans0)
                     ipol = dummytrans0(idum);
-                    t1 = min(t_ref + TT - 1, n_hours*n_series);  % (Un)Availabiliy ends
                     switch used_poles(ipol)
                         case 0
                             if trans_tipo(ipol) == 0  % Transition type (0 = to failure)
@@ -363,7 +373,6 @@ if has_dc
                                 Udcline_n(t1 + 1, branchdc_id) = 1 - Udcline_n(t_ref, branchdc_id);
                             end
                     end
-                    t_ref = t1 + 1;  % (Un)Availability starts
                 end
                 clear transition_rate Status_ini Vs transitio
 
@@ -408,10 +417,10 @@ if has_dc
                             Udcline_n(t1 + 1, branchdc_id) = 1 - Udcline_n(t_ref, branchdc_id);
                         end
                 end
-                t_ref = t1 + 1;  % Unavailability starts
 
                 clear transition_rate Status_ini
             end
+			  t_ref = t1 + 1;  % (Un)Availability starts
         end
     end
 
@@ -519,7 +528,7 @@ if has_dc
 
                     for iv = 1:size(v,1)
                         Vs = [Vs; StatusC_ini];
-                        Vs(end,v(iv,:))=not((StatusC_ini(v(iv,:))));
+                        Vs(end,v(iv,:)) = not((StatusC_ini(v(iv,:))));
 
                         a = [transition_rate];
                         b = [ones(1,length(transition_rate))];
@@ -535,11 +544,22 @@ if has_dc
                                 correlation_matrix(idxf(i2),idxf(i1)) = correlation_poles_conv;
                             end
                         end
+
+                        % Verify positive definiteness of correlation matrix before computations of copulacdf
+                        while det(correlation_matrix) < 1e-4
+                            M0 = correlation_matrix;
+                            correlation_matrix = closest_corr(M0);
+                        end
+                        correlation_matrix = (correlation_matrix + correlation_matrix')*0.5;
+                        A = eye(size(correlation_matrix,1));
+                        A = A + (correlation_matrix - diag(diag(correlation_matrix)));
+                        correlation_matrix = A;
+
                         for in1 = 1:quali_compl(1)
                             for in2 = 1:quali_compl(2)
                                 Vx = [in1 in2 ];
                                 Vss = (abs(Vs(end,:)-StatusC_ini)==0)*2+(abs(Vs(end,:)-StatusC_ini)>0)*1;
-                                dummy = dummy + ((-1).^(sum(abs(Vss-Vx)))).*copulacdf('gaussian',[AB(in1,1) AB(in2,2)],correlation_matrix);
+                                dummy = dummy + ((-1).^(sum(abs(Vss-Vx)))).*copulacdf('gaussian', [AB(in1,1) AB(in2,2)], correlation_matrix);
                             end
                         end
                         transitio = [transitio; dummy];
@@ -555,16 +575,14 @@ if has_dc
                 transition_ = transitio./sum(transitio);
 
                 idx = find(cumsum(transition_) > rd);
-
                 qualeTran = idx(1);
-
                 dquali = Vs(qualeTran,:) - StatusC_ini;
-
                 dummytrans0 = find(not(dquali == 0));
+
+				        t1 = min(t_ref + TT - 1, n_hours*n_series);  % (Un)Availabiliy ends
 
                 for idum = 1:length(dummytrans0)
                     pole_id = dummytrans0(idum);
-                    t1 = min(t_ref + TT - 1, n_hours*n_series);  % (Un)Availabiliy ends
                     switch used_poles(pole_id)
                         case 1
                             if trans_tipo(pole_id) == 0
@@ -589,15 +607,15 @@ if has_dc
                         Udcconv_p(t1 + 1, conv_id) = 1 - Udcconv_p(t_ref, conv_id);
                         Udcconv_n(t1 + 1, conv_id) = 1 - Udcconv_n(t_ref, conv_id);
                     end
-                    t_ref = t1 + 1;  % (Un)Availability starts
                 end
                 clear transition_rate StatusC_ini Vs transitio
+				        t_ref = t1 + 1;  % (Un)Availability starts
             end
         end
     end
     for s = 1:n_series
-        Udcconvs_n{s} = Udcconv_n(1+(s-1)*n_hours:n_hours*s, :);
         Udcconvs_p{s} = Udcconv_p(1+(s-1)*n_hours:n_hours*s, :);
+        Udcconvs_n{s} = Udcconv_n(1+(s-1)*n_hours:n_hours*s, :);
     end
     n_comp = min(n_conv, old_n_conv);
     if n_s * n_h * n_comp > 0
@@ -609,8 +627,8 @@ if has_dc
             old_data_n = csvread(old_file_n);
             assert(all(old_data_p(1, 1:n_comp) == 1:n_comp), strcat('Component ids in', old_file_p, ' should be ', num2str(1:n_comp), ' not ', num2str(old_data_p(1, 1:n_comp))));
             assert(all(old_data_n(1, 1:n_comp) == 1:n_comp), strcat('Component ids in', old_file_n, ' should be ', num2str(1:n_comp), ' not ', num2str(old_data_n(1, 1:n_comp))));
-            Udclines_p{s}(1:n_h, 1:n_comp) = old_data_p(2:n_h+1, 1:n_comp);
-            Udclines_n{s}(1:n_h, 1:n_comp) = old_data_n(2:n_h+1, 1:n_comp);
+            Udcconvs_p{s}(1:n_h, 1:n_comp) = old_data_p(2:n_h+1, 1:n_comp);
+            Udcconvs_n{s}(1:n_h, 1:n_comp) = old_data_n(2:n_h+1, 1:n_comp);
         end
     end
 end

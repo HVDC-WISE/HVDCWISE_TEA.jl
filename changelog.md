@@ -9,6 +9,12 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
+## [matlab_compatibility] - 2025-02-21
+### Changed
+- Octave sripts compatible with Matlab
+### To Fix
+- Correlation > 0 should be allowed for contingencies in the poles of a DC component
+
 ## [add_tests] - 2025-02-07
 ### Added
 - Number of parallel lines in AC branches
