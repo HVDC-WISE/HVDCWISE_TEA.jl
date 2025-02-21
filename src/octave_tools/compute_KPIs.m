@@ -91,7 +91,13 @@ for scenario_id=1:length(folders)
         endif
 
         if isfolder([folder_path, 'convdc\'])
-            pconv_dc = csvread([folder_path, 'convdc\pconv.csv'], 1, 0)*mpc.baseMVA;
+            pconv_dc_with_headers = csvread([folder_path, 'convdc\pconv.csv'], 0, 0);
+            pconv_dc_headers = pconv_dc_with_headers(1,:);
+            nb_rows = size(pconv_dc_with_headers,1);
+            pconv_dc = pconv_dc_with_headers(2:nb_rows,:)*mpc.baseMVA;
+            % Remove columns with only NaN
+            pconv_dc_headers = pconv_dc_headers(:,~all(isnan(pconv_dc)));
+            pconv_dc = pconv_dc(:,~all(isnan(pconv_dc)));
         endif
 
         if isfolder([folder_path, 'branch\'])
@@ -99,7 +105,13 @@ for scenario_id=1:length(folders)
         endif
 
         if isfolder([folder_path, 'branchdc\'])
-            i_dc = csvread([folder_path, 'branchdc\i_from.csv'], 1, 0);
+            i_dc_with_headers = csvread([folder_path, 'branchdc\i_from.csv'], 0, 0);
+            i_dc_headers = i_dc_with_headers(1,:);
+            nb_rows = size(i_dc_with_headers,1);
+            i_dc = i_dc_with_headers(2:nb_rows,:);
+            % Remove columns with only NaN
+            i_dc_headers = i_dc_headers(:,~all(isnan(i_dc)));
+            i_dc = i_dc(:,~all(isnan(i_dc)));
         endif
 
         validTimesteps=1:size(pg_gen,1);
@@ -262,15 +274,28 @@ for scenario_id=1:length(folders)
         Elosses_dcbranch=0;
         if exist('i_dc', 'var')
             i_dc(isnan(i_dc))=0;
-            for k=1:size(mpc.branchdc,1)
+
+            column = 1;
+            for k=1:size(mpc.branchdc ,1)
 
                 R=mpc.branchdc(k,3);  % pu, with R_base = V_base^2/mpc.baseMVA
                 R0=mpc.branchdc(k,12);  % pu, with R_base = V_base^2/mpc.baseMVA
 
-                Elosses_dcbranch=Elosses_dcbranch +...
-                    sum(i_dc(validTimesteps,k*3-2).^2)*R*mpc.baseMVA +...
-                    sum(i_dc(validTimesteps,k*3-1).^2)*R*mpc.baseMVA +...
-                    sum(i_dc(validTimesteps,k*3-0).^2)*R0*mpc.baseMVA;  % MWh
+                assert(i_dc_headers(1, column)==k);
+                assert(i_dc_headers(1, column + 1)==k);
+
+                if column + 2 <= size(i_dc_headers, 2) && i_dc_headers(1, column + 2)==k  % Bipolar branch has 3 columns
+                    Elosses_dcbranch=Elosses_dcbranch +...
+                        sum(i_dc(validTimesteps, column).^2)*R*mpc.baseMVA +...
+                        sum(i_dc(validTimesteps, column + 1).^2)*R*mpc.baseMVA +...
+                        sum(i_dc(validTimesteps, column + 2).^2)*R0*mpc.baseMVA;  % MWh
+                    column = column + 3;
+                else
+                    Elosses_dcbranch=Elosses_dcbranch +...
+                        sum(i_dc(validTimesteps, column).^2)*R*mpc.baseMVA +...
+                        sum(i_dc(validTimesteps, column + 1).^2)*R*mpc.baseMVA;  % MWh
+                    column = column + 2;
+                endif
             endfor
             Elosses_dcbranch=Elosses_dcbranch*8760/length(validTimesteps); % extrapolation for 1-year time horizon (MWh/y)
         endif
@@ -286,12 +311,22 @@ for scenario_id=1:length(folders)
 
             % transformer losses of ac-dc converter
             Elosses_dctrafo=0;
+            column=1;
             for k=1:size(mpc.convdc,1)
                 cosphi=0.95;
                 Rpu=mpc.convdc(k,9); % column rtf in mpc.convdc. pu, with R_base = V_base^2/mpc.baseMVA
-                Elosses_dctrafo=Elosses_dctrafo+...
-                    sum(pconv_dc(validTimesteps,k*2-1).^2)*Rpu/mpc.baseMVA/cosphi^2+...
-                    sum(pconv_dc(validTimesteps,k*2-0).^2)*Rpu/mpc.baseMVA/cosphi^2;  % MWh
+
+                assert(pconv_dc_headers(1, column)==k);
+                if column + 1 <= size(pconv_dc_headers, 2) && pconv_dc_headers(1, column + 1)==k  % Bipolar has two columns
+                    Elosses_dctrafo=Elosses_dctrafo+...
+                        sum(pconv_dc(validTimesteps, column).^2)*Rpu/mpc.baseMVA/cosphi^2+...
+                        sum(pconv_dc(validTimesteps, column + 1).^2)*Rpu/mpc.baseMVA/cosphi^2;  % MWh
+                    column = column + 2;
+                else
+                    Elosses_dctrafo=Elosses_dctrafo+...
+                        sum(pconv_dc(validTimesteps, column).^2)*Rpu/mpc.baseMVA/cosphi^2;  % MWh
+                    column = column + 1;
+                endif
             endfor
             Elosses_dctrafo=Elosses_dctrafo*8760/length(validTimesteps); % extrapolation for 1-year time horizon (MWh/y)
         else

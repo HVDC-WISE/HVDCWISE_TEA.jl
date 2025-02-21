@@ -16,7 +16,7 @@ function init_database(paths::Vector{Any}, model_type::Type, solver; kwargs...)
 
     db = Dict{String,Any}()
     for (key, value) in results
-        db[key] = Dict{String, Matrix{Float64}}()
+        db[key] = Dict{String,Matrix{Float64}}()
         for var in keys(last(first(value)))
             if key != "busdc" && var in names
                 continue
@@ -38,22 +38,27 @@ function init_database(paths::Vector{Any}, model_type::Type, solver; kwargs...)
                     elseif info[ref] == 2
                         cols = [1, 2, 3]
                     end
-                    if dim == 2
-                        pop!(cols)
+                    if dim == 2  # && info[ref]!=1 ?
+                        # Remove last element of cols, except if there is only monopolar DC.
+                        if !(key == "convdc" && var == "iconv_dc") && !(key == "branchdc" && var == "i_from") && !(key == "branchdc" && var == "i_to")
+                            pop!(cols)
+                        end
                     end
                     db[key][var][parse(Int, row), cols] .= 0
                 end
             elseif contains(key, "bus") && dim > 1
-                replace!(db[key][var], Inf=>0.0)
+                replace!(db[key][var], Inf => 0.0)
+            elseif key == "convdc" && dim == 1  # If there is only monopolar converter
+                replace!(db[key][var], Inf => 0.0)
             end
-            replace!(db[key][var], Inf=>NaN)
+            replace!(db[key][var], Inf => NaN)
         end
     end
     return db, collect(range(stop=hours))
 end
 
 
-function export_results(solution::Dict{String, Any}, database, path::String)
+function export_results(solution::Dict{String,Any}, database, path::String)
 
     con = ["p", "n", "r"]
     nws = string.(sort!(parse.(Int, collect(keys(solution["nw"])))))
@@ -67,7 +72,8 @@ function export_results(solution::Dict{String, Any}, database, path::String)
             names = reduce(vcat, [string(h) .* con[axes(vars[var], 2)] for h in axes(vars[var], 1)])
             for nw in nws
                 ref = copy(vars[var])
-                if size(ref, 2) > 1
+                if data[nw][1, 2] isa Array  # Catches Arrays of size 1 too
+                    @assert(all(data_list isa Array for data_list in data[nw][:, 2]))
                     for v in eachrow(data[nw])
                         cols = findall(iszero, ref[first(v), :])
                         ref[first(v), cols] = last(v)
