@@ -1,4 +1,5 @@
 % Code developed by Marco ROSSI (RSE) and Nicolas BARLA (SuperGrid Institute)
+pkg load io
 clc
 vars_to_delete = setdiff(who, {'work_dir'});
 if length(vars_to_delete) > 0
@@ -30,6 +31,20 @@ assert(isnan(macro_scenario) == 0, strcat("No .m file has been found in ", simul
 
 simulation_results_dir = [simulation_dir, '\', macro_scenario];
 user_results_dir = [work_dir, '\user_interface\results'];
+user_inputs_dir = [work_dir,'\user_interface\inputs'];
+
+%% Read gen types from user inputs
+model_filepath = strcat(user_inputs_dir,filesep, macro_scenario,"_model.xlsx");
+[~, ~, gen_sheet] = xlsread(model_filepath, "gen");
+gen_sheet(1:3, :) = [];
+gen_types = gen_sheet(:, 4);  % Remove headers and keep id colum and gen type column
+
+[~, ~, gen_res_sheet] = xlsread(model_filepath, "gen_res");
+gen_res_sheet(1:3, :) = [];
+gen_res_types = gen_res_sheet(:, 4);  % Remove headers and keep id colum and gen type column
+
+all_gen_types = [unique(gen_types(:)); unique(gen_res_types(:))];
+
 
 %% load grid model (.m file)
 addpath(simulation_dir);
@@ -63,10 +78,20 @@ endfor
 folders=dir(simulation_results_dir);
 folders(1:2)=[];
 
+unit_header = cell(1, length(all_gen_types) + 1);
+unit_header(:) = "MWh";
+unit_header(1) = "Unit";
+generated_power = ["Scenario\\Gen type", transpose(all_gen_types); unit_header];
+
 for scenario_id=1:length(folders)
     folder_path = [folders(scenario_id).folder, '\', folders(scenario_id).name, '\'];
     scenario_name=folders(scenario_id).name;
     KPI.scenario_name{scenario_id} = scenario_name;
+
+    for i = 1:length(all_gen_types)
+      produced_energy_per_type.(char(all_gen_types(i, 1))) = 0;
+    endfor
+
     if length(dir(folder_path)) > 2 % '.' and '..' and in an empty folder
 
         disp(strcat('KPI computation for scenario', num2str(scenario_id), ': ', scenario_name))
@@ -164,6 +189,10 @@ for scenario_id=1:length(folders)
             pg_gen(isnan(pg_gen(:,k_gen)),k_gen)=0;  % MW, vector(time)
             cost_generation = cost_generation + sum(pg_gen(validTimesteps,k_gen).*mpc.gencost(k_gen,5));  % €
             welfare_producers = welfare_producers + sum(pg_gen(validTimesteps,k_gen).*(maxPrice-mpc.gencost(k_gen,5)));  % €
+
+            % Get type from id and increase produced_energy_per_type struct
+            gen_type = char(gen_types(k_gen));
+            produced_energy_per_type.(gen_type) += sum(pg_gen(validTimesteps, k_gen));
         endfor
 
         % Non-dispatchable generators
@@ -174,8 +203,19 @@ for scenario_id=1:length(folders)
                 cost_curtailment_ndgen = cost_curtailment_ndgen + sum(pg_curt(validTimesteps,k_ndgen).*mpc.ndgen(k_ndgen-number_of_dispatchable_gen,7));  % €
                 welfare_producers = welfare_producers + sum(pg_gen(validTimesteps,k_ndgen).*(maxPrice-mpc.ndgen(k_ndgen-number_of_dispatchable_gen,6)));  % €
                 % Should we do welfare_producers = welfare_producers - cost_curtailment_ndgen ?
+
+                % Get type from id and increase produced_energy_per_type struct
+                gen_res_type = char(gen_res_types(k_ndgen - number_of_dispatchable_gen));
+                produced_energy_per_type.(gen_res_type) += sum(pg_gen(validTimesteps, k_ndgen));
             endfor
         endif
+
+        % Save total production per type in generated_power table
+        generated_power(scenario_id+2,1) = scenario_name;
+        for i = 1:length(all_gen_types)
+          gen_type = char(all_gen_types(i, 1));
+          generated_power(scenario_id + 2, i + 1) = produced_energy_per_type.(gen_type) * 8760 / length(validTimesteps);
+        endfor
 
         % Storages
         if isfield(mpc, 'storage')
@@ -428,6 +468,7 @@ for i = 1:nRows
     endfor
 endfor
 
-xlswrite([user_results_dir, '\KPI_results.xlsx'], data);
+xlswrite([user_results_dir, '\KPI_results.xlsx'], data, "KPIs");
+xlswrite([user_results_dir, '\KPI_results.xlsx'], generated_power, "Power per gen type");
 
 disp('KPI computation completed')
