@@ -54,7 +54,7 @@ function reliability_data = read_reliability_data(work_dir, is_octave)
         comp_name = components_localised{i-3};
         assert(sheet{i,1} == comp_name, strcat("Cell A", num2str(i), " in ", reliability_data_path, " should be ", comp_name, ", not ", sheet{i,1}))
         for j = 2:3
-            assert(isempty(sheet{i,j}) == 0, strcat("No cell in B", num2str(i), ":C", num2str(i), " in ", reliability_data_path, " should be empty. ", mat2str(sheet{i,2:3})))
+            assert(isempty(sheet{i,j}) == 0, strcat("No cell in B", num2str(i), ":C", num2str(i), " in ", reliability_data_path, " should be empty. ", mat2str(sheet{i,2}), mat2str(sheet{i,3})))
         end
         comp_name = strrep(comp_name, " ", "_");
         input_data.(comp_name) = struct();
@@ -69,7 +69,7 @@ function reliability_data = read_reliability_data(work_dir, is_octave)
         assert(strcmp(sheet{i,1}, comp_name), strcat("Cell A", num2str(i), " in ", reliability_data_path, " should be ", comp_name, ", not ", sheet{i,1}))
         assert(isempty(sheet{i,2}) == 0, strcat("Cell B", num2str(i), " in ", reliability_data_path, " should not be empty. ", mat2str(sheet{i,2})))
         for j = 4:5
-            assert(isempty(sheet{i,j}) == 0, strcat("No cell in D", num2str(i), ":E", num2str(i), " in ", reliability_data_path, " should be empty. ", mat2str(sheet{i,4:5})))
+            assert(isempty(sheet{i,j}) == 0, strcat("No cell in D", num2str(i), ":E", num2str(i), " in ", reliability_data_path, " should be empty. ", mat2str(sheet{i,4}), mat2str(sheet{i,5})))
         end
         comp_name = strrep (comp_name, " ", "_");
         input_data.(comp_name) = struct();

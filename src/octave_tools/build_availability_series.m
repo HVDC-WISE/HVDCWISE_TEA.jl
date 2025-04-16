@@ -22,7 +22,7 @@ assert(exist('n_series', 'var') == 1, "n_series is not defined")
 assert(exist('n_hours', 'var') == 1, "n_hours is not defined")
 if ~isnumeric(is_octave)
     is_octave = str2num(is_octave);
-    if is_octave != 1
+    if is_octave ~= 1
         assert(is_octave == 0, "is_octave should be 1 or 0")
     end
 end

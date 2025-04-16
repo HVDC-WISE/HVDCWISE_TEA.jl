@@ -9,11 +9,11 @@ All notable changes to HVCWISE_TEA will be documented in this file.
 ### Removed
 ### Fixed
 
-## [matlab_compatibility] - 2025-02-21
+## [matlab_compatibility] - 2025-04-16
 ### Changed
 - Octave sripts compatible with Matlab
-### To Fix
-- Correlation > 0 should be allowed for contingencies in the poles of a DC component
+- Correlation > 0 be allowed (with Matlab, not with Octave) for contingencies in the poles of a DC component
+- User guide in the ReadMe
 
 ## [add_tests] - 2025-02-07
 ### Added
