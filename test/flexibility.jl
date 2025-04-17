@@ -24,8 +24,8 @@
         # Solve optimisation problem
         result = _HWTEA.solve_mc_acdcopf(data, _PM.DCPPowerModel, lp_optimizer, setting = s)
 
-        @test result["solution"]["load"]["9"]["pflex"]      ≈ 3.488     rtol=1e-3
-        @test result["solution"]["load"]["9"]["pcurt"]      ≈ 0.512     atol=1e-3
+        @test result["solution"]["load"]["9"]["pflex"]      ≈ 3.488 + 0.512     rtol=1e-3
+        @test result["solution"]["bus"]["11"]["p_slack_up"] ≈ 0.512     atol=1e-3  # curtailment of load "9"
         @test result["solution"]["gen"]["5"]["pg"]          ≈ 3.0       rtol=1e-3
         @test result["solution"]["convdc"]["3"]["pdc"][1]   ≈ 0.5       atol=1e-3
         @test result["objective"]                           ≈ 156410.4  rtol=1e-3    
