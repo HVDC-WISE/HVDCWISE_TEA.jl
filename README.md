@@ -26,9 +26,9 @@ This code is being developed as part of the HVDC-WISE project under the European
 This code is provided under a [BSD 3-Clause License](/LICENSE.md).
 
 
-## User guide
+## A. User guide
 
-### Configure a study
+### A1. Configure a study
 
 Running a study consists in assessing a macro-scenario (grid model and associated cost assumptions) for several micro-scenario (time series of contingencies per component, available power per generator, and demand per load).
 The macro-scenario and associated micro-scenarios must be defined in the user folder, in which the post-processed results will be saved at the end of the sequence. User inputs and results are Excel files containing data in their base units (MVA, kV, kA, …) while intermediary simulation inputs and outputs are text (.csv or .m) files with data in per unit.
@@ -44,14 +44,14 @@ The templates for these files are downloadable in the folder **[templates](templ
 
 All these inputs (units, description, ...) are detailed in the Excel templates.
 
-### Software installation
+### A2. Software installation
 
 Several software must be installed before installing and running HVDCWISE_TEA:
 - Julia
 - Octave or Matlab
 - VSCode
 
-[Julia](https://julialang.org/download) is the main language of the software. Make sure the “Add Julia to PATH” option is checked during the installation process.
+[Julia](https://julialang.org/downloads) is the main language of the software. Make sure the “Add Julia to PATH” option is checked during the installation process.
 
 [Octave](https://octave.org/download) or [Matlab](https://www.mathworks.com/help/install/ug/install-products-with-internet-connection.html) is required to generate the availability time series and to compute the KPIs. If you use Octave you will not be able to model correlation between DC components poles failures. It will work if you use Matlab, but you will need the **Statistics and Machine Learning Toolbox**
 During the installation process, note what the destination folder of Octave (or Matlab) is. It could be asked by HVDCWISE_TEA if it does not find it in your Windows environment variables. 
@@ -68,7 +68,7 @@ Other VSCode extensions may be interestingly installed for better user experienc
 
 The following sections assume that the user only wants to use the last version of the software, by importing it in a Julia script. If you want to access the full code and all versions, and possibly contribute to the developments, you can install it with Git for Windows as explained in the **Developer guide** at the end of this ReadMe.
 
-### Main script to run a study
+### A3. Main script to run a study
 
 To run a study, you first need to write a main script calling HVDCWISE_TEA. To do so, you can download the file [main.jl](main.jl) at the root of this Github project.
 Once your main file is opened with VSCode, you have to update the parameters of the function run_study():
@@ -83,7 +83,7 @@ Once your main file is opened with VSCode, you have to update the parameters of 
 
 Before running your main script you need to configure your Julia environment as explained below.
 
-### Configure Julia environment
+### A4. Configure Julia environment
 
 Before running HVDCWISE_TEA with Julia, the user must create a Julia environment, in which all the settings and configuration parameters needed to run and develop a Julia program are specified. In particular, within this environment the Julia package HVDCWISE_TEA.jl and all the other packages that are required to successfully execute the scripts must be installed. For example, HVDCWISE_TEA.jl does not depend on any specific solver and, thus, a Julia solver package must be installed as well. It is worth noting that HVDCWISE_TEA.jl will automatically install in the environment all the packages on which HVDCWISE_TEA.jl depends, such as PowerModels.jl. The procedure is shown hereafter:
 1.	Open with VSCode the folder containing your main.jl script.
@@ -121,16 +121,16 @@ You are now ready to run your study: simply click on the run button (at the top-
 Next times you want to run a study you will just need to activate your environment (steps 1 to 3) and to click on the run button.
 
 
-### Analyse the results
+### A5. Analyse the results
 
 The results will be saved in the subfolder user_interface/results. There will be:
 - A file KPI_results.xlsx with one line per micro-scenario and one column per KPI.
 - A folder per micro-scenario, containing a file OPF_results.xlsx with one sheet per component type, one column per component id, and one line per hour and component attribute. It is advised to filter these Excel sheets
 
 
-## Developer guide
+## B. Developer guide
 
-### Installation with Git
+### B1. Installation with Git
 
 To install HVDCWISE_TEA with git you first need to install [Git for Windows](https://git-scm.com/download/win)
 Once Git for Windows is installed, you can use it to clone the HVDCWISE_TEA package by doing the following steps:
@@ -148,7 +148,7 @@ This command lines will install the last version of HVDCWISE_TEA. If you want to
 To learn to use git: https://learngitbranching.js.org/
 
 
-### Running a study with VSCode
+### B2. Running a study with VSCode
 
 To run a study you need:
 - A study folder including a subfolder user_interface/inputs/ with the input files specifying your study
