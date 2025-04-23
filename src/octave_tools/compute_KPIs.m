@@ -221,8 +221,8 @@ for scenario_id=1:length(folders)
         actors_sales(scenario_id + 2, 1) = scenario_name;
         for i = 1:length(all_gen_types)
           gen_type = char(all_gen_types(i, 1));
-          generated_power(scenario_id + 2, i + 1) = produced_energy_per_type.(gen_type) / 1e3 * 8760 / length(validTimesteps);
-          actors_sales(scenario_id + 2, i + 1) = sales_per_type.(gen_type) / 1e6 * 8760 / length(validTimesteps);
+          generated_power(scenario_id + 2, i + 1) = produced_energy_per_type.(gen_type) * 8760 * MWh_to_TWh / length(validTimesteps);
+          actors_sales(scenario_id + 2, i + 1) = sales_per_type.(gen_type) * euro_to_Meuro * 8760 / length(validTimesteps);
         endfor
 
         % Storages
