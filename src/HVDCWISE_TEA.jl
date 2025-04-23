@@ -50,6 +50,7 @@ include("io/build_outputs.jl")
 include("io/build_raw_inputs.jl")
 include("io/build_simulation_inputs.jl")
 include("io/build_user_results.jl")
+include("io/create_visualisation.jl")
 include("io/load_case.jl")
 include("io/export.jl")
 include("io/multiconductor.jl")
@@ -80,8 +81,8 @@ for sym in names(@__MODULE__, all=true)
         continue
     end
     if !(Base.isidentifier(sym) || (startswith(sym_string, "@") &&
-         Base.isidentifier(sym_string[2:end])))
-       continue
+                                    Base.isidentifier(sym_string[2:end])))
+        continue
     end
     @eval export $sym
 end
