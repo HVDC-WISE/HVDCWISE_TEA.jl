@@ -5,9 +5,10 @@ function run_octave_script(script_path::String, tool_path::String, kwargs::Dict)
         commands = "$key = '$value'; $commands"
     end
     if occursin("octave", basename(tool_path))
-        run(`$tool_path --no-gui --eval "$commands"`) # --no-gui to launch Octave without graphical interface
-    elseif occursin("matlab", basename(tool_path))
-        run(`$tool_path -batch  --eval "$commands"`) # FIXME This code has never been tested successfully
+        run(`$tool_path --no-gui --eval "is_octave = '1'; $commands"`) # --no-gui to launch Octave without graphical interface
+    else
+        @assert occursin("matlab", basename(tool_path)) "The file name of your matlab/octave launcher should contain 'matlab' or octave'\n$tool_path"
+        run(`$tool_path -batch  --eval "is_octave = '0'; $commands"`) # FIXME This code has never been tested successfully
     end
 end
 # Function to detect if Matlab or Octave is installed
@@ -25,7 +26,7 @@ function detect_octave()
             return joinpath(dir, "octave-launch.exe")
         end
     end
-    println("Octave was not found in your system path. Please provide the path of your file octave-launch.exe\nIf you want to stop the process and exit, you can write 'exit'")
+    println("Octave was not found in your system path. Please provide the path of your file octave-launch.exe or matlab.exe\nIf you want to stop the process and exit, you can write 'exit'")
     println("To stop having this message, you can add this path to your environment variables")
     println("Example of path: C:/Users/n.barla/AppData/Local/Programs/GNU Octave/Octave-9.2.0/octave-launch.exe")
     println("Before providing this path, write '1' and press ENTER (this first line will not be read by Julia)")
@@ -42,10 +43,9 @@ function is_octave_path(tool_path::String)
         if occursin("octave", basename(tool_path))
             return true
         elseif occursin("matlab", basename(tool_path))
-            println("Your input corresponds to Matlab, it is not recommended")
             return true
         else
-            println("Your input file name ($(basename(tool_path))) should be 'octave-launch.exe'\nPlease retry.")
+            println("Your input file name ($(basename(tool_path))) should be 'octave-launch.exe' or 'matlab.exe'\nPlease retry.")
         end
     elseif occursin("exit", tool_path)
         error("Octave is not installed on this system.")

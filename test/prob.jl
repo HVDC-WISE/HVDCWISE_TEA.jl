@@ -11,7 +11,7 @@
         @testset "case5_2grids_MC" begin
 
             file = joinpath(_HWTEA_dir, "test/data/grids/acdc/case5_3grids_MC.m")
-            result_dcp = _HWTEA.solve_mc_acdcopf(file, _PM.DCPPowerModel, lp_optimizer)
+            result_dcp = _HWTEA.solve_mc_acdcopf(Vector{Any}([file]), _PM.DCPPowerModel, lp_optimizer)
             @test result_dcp["termination_status"] == _HWTEA.OPTIMAL
             @test result_dcp["objective"] ≈ 823.0 rtol = 1e-3
         end

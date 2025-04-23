@@ -5,6 +5,9 @@ using XLSX
 
 function build_simulation_inputs(work_dir::String, previous_work_dir, n_availability_series, base_mva::Int, octave_path::String)
     model_data = build_grid_model(work_dir, base_mva)
+    # Create visualisation
+    create_plotly_figure(work_dir, model_data)
+
     power_series_info = build_power_series(work_dir, base_mva, model_data)
     n_power_series = power_series_info["n_series"]  # Not used
     n_hours = power_series_info["n_hours"]
@@ -53,14 +56,14 @@ function build_grid_model(work_dir::String, base_mva::Int)
 
     for file_name in readdir(user_inputs_dir)
         if occursin("_model.xlsx", file_name)
-            @assert (macro_scenario == "")  "2 files could contain the grid model data: $macro_scenario" * "_model.xlsx and $file_name. Please delete or rename the wrong file."
+            @assert (macro_scenario == "") "2 files could contain the grid model data: $macro_scenario" * "_model.xlsx and $file_name. Please delete or rename the wrong file."
             macro_scenario = file_name[1:length(file_name)-11]
-            @assert (!occursin(macro_scenario, " "))  "The file name of your '_model.xlsx' file should not contain any space. $file_name"
+            @assert (!occursin(macro_scenario, " ")) "The file name of your '_model.xlsx' file should not contain any space. $file_name"
         end
     end
     @assert (macro_scenario != "") "The file containing the grid model data should end with '_model.xlsx'. This file has not been found in $user_inputs_dir."
-    model_path = joinpath(user_inputs_dir, "$macro_scenario"*"_model.xlsx")
-    @assert isfile(model_path)  "$model_path is not a file"
+    model_path = joinpath(user_inputs_dir, "$macro_scenario" * "_model.xlsx")
+    @assert isfile(model_path) "$model_path is not a file"
 
     costs_path = joinpath(user_inputs_dir, "costs_data.xlsx")
     @assert isfile(costs_path) "The file containing the cost data should be 'costs_data.xlsx'. This file has not been found in $user_inputs_dir."
@@ -100,14 +103,14 @@ function build_grid_model(work_dir::String, base_mva::Int)
     # Read grid model and build a nested dictionary from it
 
     model_attributes = Dict(
-        "bus" => ["base voltage"],
-        "busdc" => ["base voltage"], 
-        "branch" => ["from bus id",  "to bus id", "type", "length", "power rating", "resistance", "reactance", "number of lines"], 
-        "branchdc" => ["from bus id",  "to bus id", "type", "length", "configuration", "power rating", "resistance"],
-        "convdc" => ["AC bus id",  "DC bus id", "type", "configuration", "power rating"],
-        "gen" => ["bus id", "type", "power rating"], 
-        "gen_res" => ["bus id", "type", "power rating"], 
-        "load" => ["bus id", "type", "power rating", "max power shift up", "max power shift down", "max voluntary reduced power"], 
+        "bus" => ["base voltage", "latitude", "longitude"],
+        "busdc" => ["base voltage", "latitude", "longitude"],
+        "branch" => ["from bus id", "to bus id", "type", "length", "power rating", "resistance", "reactance", "number of lines"],
+        "branchdc" => ["from bus id", "to bus id", "type", "length", "configuration", "power rating", "resistance"],
+        "convdc" => ["AC bus id", "DC bus id", "type", "configuration", "power rating"],
+        "gen" => ["bus id", "type", "power rating"],
+        "gen_res" => ["bus id", "type", "power rating"],
+        "load" => ["bus id", "type", "power rating", "max power shift up", "max power shift down", "max voluntary reduced power"],
         "storage" => ["bus id", "type", "production rating", "consumption rating", "initial energy", "energy rating", "production efficiency", "consumption efficiency", "self discharge rate"])
     model_units = Dict(comp_name => Dict() for comp_name in keys(model_attributes))
     model_data = Dict(comp_name => Dict() for comp_name in keys(model_attributes))
@@ -128,13 +131,19 @@ function build_grid_model(work_dir::String, base_mva::Int)
             n_cols = length(model_attributes[comp_name]) + 2
         end
         @assert [comp_sheet[1, j] for j in 3:n_cols] == model_attributes[comp_name] "$model_path sheet $comp_name B3:end3 is $([comp_sheet[1,j] for j in 3:n_cols]) instead of $(model_attributes[comp_name])"
-        @assert [comp_sheet[1,j] for j in 3:n_cols] == model_attributes[comp_name] "$model_path sheet $comp_name B3:end3 is $([comp_sheet[1,j] for j in 3:n_cols]) instead of $(model_attributes[comp_name])"
+        @assert [comp_sheet[1, j] for j in 3:n_cols] == model_attributes[comp_name] "$model_path sheet $comp_name B3:end3 is $([comp_sheet[1,j] for j in 3:n_cols]) instead of $(model_attributes[comp_name])"
         for j in 2:n_cols
             model_units[comp_name][comp_sheet[1, j]] = comp_sheet[2, j]
         end
         for i in 4:n_rows
             if Set([comp_sheet[i, j] for j in 2:n_cols]) != Set(["missing"])  # The row is not empty
-                @assert !in("missing", [string(comp_sheet[i, j]) for j in 2:n_cols]) "$model_path sheet $comp_name row $i. Some data is missing: $([comp_sheet[i,j] for j in 2:n_cols])"
+                if in(comp_name, ["bus", "busdc"])
+                    # Ignore missing latitudes and longitudes (two last columns)
+                    @assert !in("missing", [string(comp_sheet[i, j]) for j in 2:n_cols-2]) "$model_path sheet $comp_name row $i. Some data is missing: $([comp_sheet[i,j] for j in 2:n_cols-2])"
+                else
+                    # Check all columns
+                    @assert !in("missing", [string(comp_sheet[i, j]) for j in 2:n_cols]) "$model_path sheet $comp_name row $i. Some data is missing: $([comp_sheet[i,j] for j in 2:n_cols])"
+                end
                 @assert comp_sheet[i, 2] == i - 3 "$model_path sheet $comp_name row $i. $comp_name id should be $(i-3) instead of $(comp_sheet[i,2])"
                 comp_id = i - 3
                 model_data[comp_name][comp_id] = Dict(comp_sheet[1, j] => comp_sheet[i, j] for j in 3:n_cols)
